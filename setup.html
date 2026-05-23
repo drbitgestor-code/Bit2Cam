@@ -488,37 +488,46 @@ async function startScan() {
     const raw = await res.json();
     waveEl.classList.add('hidden');
 
-    // Normaliza resposta em [{url, name}], cobrindo todos os formatos do go2rtc:
-    //   Array   [{url, name, info}]               — formato v1.9+
-    //           [{sources:[...], name}]            — itens com campo sources
-    //   Objeto  {"sources": ["onvif://ip"]}        — único dispositivo descoberto
-    //           {"devname": ["onvif://..."], ...}  — chaves = nomes de dispositivos
+    // Extrai URL onvif:// de qualquer valor que go2rtc possa retornar
+    const pickOnvif = arr => arr.find(u => typeof u === 'string' && u.startsWith('onvif://')) || null;
+
+    function extractUrl(val) {
+      if (!val) return '';
+      if (typeof val === 'string') return val;
+      // {"producers": [{"url": "onvif://..."}]}  ← formato streams API
+      if (Array.isArray(val.producers)) {
+        const p = val.producers.find(p => String(p.url||'').startsWith('onvif://'));
+        return p ? String(p.url) : (val.producers[0]?.url ? String(val.producers[0].url) : '');
+      }
+      // {"sources": ["onvif://..."]}
+      if (Array.isArray(val.sources)) return pickOnvif(val.sources) || '';
+      // array de strings
+      if (Array.isArray(val))         return pickOnvif(val.map(String)) || String(val[0]||'');
+      return '';
+    }
+
+    // Normaliza resposta em [{url, name}] independente do formato go2rtc:
+    //   Array   [{url, name}]  [{sources:[...]}, ...]  [{producers:[...]}]
+    //   Objeto  {"sources":[]} {"devname":[urls]}  {"devname":{producers:[{url}]}}
     let data = [];
 
-    const pickOnvif = arr => arr.find(u => String(u).startsWith('onvif://')) || arr[0];
-
     if (Array.isArray(raw)) {
-      data = raw.map(item => {
-        const url = item.url
-          || (Array.isArray(item.sources) ? pickOnvif(item.sources) : null);
-        return { url: String(url || ''), name: item.name || item.info || '' };
-      }).filter(item => item.url);
+      data = raw.map(item => ({
+        url:  extractUrl(item.url) || extractUrl(item.sources) || '',
+        name: item.name || item.info || '',
+      })).filter(d => d.url && !d.url.includes('[object'));
 
     } else if (raw && typeof raw === 'object') {
       if (Array.isArray(raw.sources)) {
-        // {"sources": ["onvif://ip", "rtsp://..."]} — um dispositivo
+        // {"sources": ["onvif://ip"]}  — único dispositivo
         const url = pickOnvif(raw.sources);
-        if (url) data = [{ url: String(url), name: '' }];
+        if (url) data = [{ url, name: '' }];
       } else {
-        // {"devname": [...urls], ...}
+        // {"devname": val, ...}  — um ou mais dispositivos
         data = Object.entries(raw)
           .filter(([k]) => !['producers','consumers','tracks'].includes(k))
-          .map(([name, val]) => {
-            const arr = Array.isArray(val) ? val : [String(val)];
-            const url = pickOnvif(arr);
-            return { url: String(url || ''), name };
-          })
-          .filter(item => item.url);
+          .map(([name, val]) => ({ url: extractUrl(val), name }))
+          .filter(d => d.url && !d.url.includes('[object'));
       }
     }
 
