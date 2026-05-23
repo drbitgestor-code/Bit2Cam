@@ -78,18 +78,19 @@ do_change_password() {
 # ── ATUALIZAR HTMLs ──────────────────────────────────────────────
 _download_html() {
   local file="$1"
-  local src="$SCRIPT_DIR/$file"
   local dest="$WWW_DIR/$file"
 
-  if [[ -f "$src" ]]; then
-    cp "$src" "$dest"
-    success "$file copiado da pasta local"
+  info "Baixando $file do GitHub..."
+  if curl -fsSL --max-time 30 "$GITHUB_REPO/$file" -o "$dest"; then
+    success "$file atualizado do GitHub"
   else
-    info "$file não encontrado localmente — baixando do GitHub..."
-    if curl -fsSL --max-time 30 "$GITHUB_REPO/$file" -o "$dest" 2>/dev/null; then
-      success "$file baixado do GitHub"
+    # fallback: cópia local se GitHub falhar
+    local src="$SCRIPT_DIR/$file"
+    if [[ -f "$src" ]]; then
+      cp "$src" "$dest"
+      warn "$file: GitHub falhou — copiado da versão local"
     else
-      error "Falha ao baixar $file do GitHub — verifique a conexão"
+      error "Falha ao baixar $file — verifique a conexão com o GitHub"
     fi
   fi
 }
