@@ -1,93 +1,106 @@
-# GO2RTC Monitor — Documentação do Projeto
+# Bit2Cam — Documentação do Projeto
+
+Monitor de câmeras IP baseado em go2rtc, com wizard de configuração via ONVIF.
 
 ## Arquivos
 
 | Arquivo | Descrição |
 |---|---|
-| `cameras-v22.html` | Monitor standalone — salva em localStorage, abre direto no browser |
-| `cameras-v23.html` | Monitor com Config API — sincroniza com servidor, fallback para localStorage |
+| `setup.html` | Wizard de primeiro uso — descobre câmeras ONVIF, configura go2rtc e o monitor |
+| `cameras-v23.html` | Monitor de câmeras — visualização em grid com sync via Config API |
 | `install.sh` | Instalador para Ubuntu Server headless |
+| `archive/cameras-v22.html` | Versão standalone anterior (referência) |
 
 ---
 
-## cameras-v22.html — Standalone
+## Fluxo de uso
 
-Versão autossuficiente. Abre direto no browser via `file://` ou servido localmente.  
-Toda a configuração é salva no `localStorage` do browser (`go2rtc_v22`).
+```
+1. sudo bash install.sh        → instala go2rtc + serviços
+2. http://host:1984/setup.html → descobre câmeras e configura tudo
+3. http://host:1984/cameras-v23.html → monitora as câmeras
+```
+
+---
+
+## setup.html — Wizard de Configuração
+
+Wizard de 4 passos que usa a API nativa do go2rtc para descoberta ONVIF.
+Não requer dependências extras além do próprio go2rtc.
+
+### Passos
+
+| Passo | O que faz |
+|---|---|
+| **1 · Conectar** | Verifica se go2rtc responde na porta 1984. Exibe host, porta e quantidade de streams já configurados. Se falhar, mostra instruções para rodar o `install.sh`. |
+| **2 · Descobrir** | Chama `GET /api/onvif` do go2rtc — executa WS-Discovery multicast na rede. Câmeras encontradas aparecem como cards clicáveis. Permite adicionar câmeras manualmente por IP caso não respondam ao multicast. |
+| **3 · Credenciais** | Para cada câmera selecionada: nome de exibição, usuário e senha. Botão **Testar** chama `GET /api/onvif?src=onvif://user:pass@ip` e exibe os perfis disponíveis (ex: MainStream 4MP / SubStream 720p) para seleção. |
+| **4 · Finalizar** | `PUT /api/streams` em cada câmera — persiste no `go2rtc.yaml`. Atualiza `config.json` via Config API para o monitor. Exibe log linha a linha e botão **Abrir Monitor →**. |
+
+### Como acessar
+
+```
+http://<ip-do-servidor>:1984/setup.html
+```
+
+### Requisitos
+
+- go2rtc rodando na porta 1984 (instalado via `install.sh`)
+- go2rtc na **mesma subrede** das câmeras (WS-Discovery usa multicast UDP, não atravessa roteadores)
+- Câmeras com suporte a ONVIF habilitado
+
+### Adicionar câmera manualmente (sem ONVIF)
+
+No passo 2, preencher **IP** e **Porta ONVIF** (padrão 80) e clicar em `+ Adicionar`.
+A câmera entra no mesmo fluxo de credenciais dos passos seguintes.
+
+---
+
+## cameras-v23.html — Monitor
+
+Versão principal para deploy no servidor. Sincroniza configuração via Config API
+com fallback para localStorage.
 
 ### Funcionalidades
 
 - Grid automático de câmeras (layout calculado por `sqrt(n)`)
 - Suporte a múltiplos servidores go2rtc com código de cor por servidor
 - Dual stream: câmeras com sufixo `_hd` usam alta resolução no fullscreen
-- Importação automática de câmeras via `GET /api/streams`
-- Scan de rede local para descobrir servidores go2rtc (WebRTC ICE + fetch paralelo)
+- Importação automática de câmeras via `GET /api/streams` do go2rtc
+- Scan de rede local para descobrir servidores go2rtc
 - Sidebar com busca, seleção e reordenação drag-and-drop
 - Fullscreen nativo com auto-hide do header e hot corner (6px no topo)
 - Geração de arquivo standalone com config embutida (`generateStandalone`)
 - Backup/restore via JSON codificado em Base64
 
-### Segurança (corrigida)
-- Função `esc()` sanitiza todos os `innerHTML` com dados do usuário (XSS)
-- `streamUrl()` valida esquema `http(s)://` antes de montar URLs
-- `importConfig()` valida estrutura do JSON antes de aceitar
-- Limpeza de iframes ao aplicar seleção (evita leak de conexões WebRTC)
+### Persistência
 
-### UX / Acessibilidade
-- Fonte Orbitron no logo (design system cyberpunk)
-- Focus rings visíveis em todos os elementos interativos (`:focus-visible`)
-- `prefers-reduced-motion` — desativa animações para quem precisar
-- `aria-label` em botões sem texto (☰, ⛶, ✕)
-- `touch-action: manipulation` em todos os botões (remove delay 300ms no mobile)
-- `role="status" aria-live="polite"` no painel de scan
-- Scanlines e glow hover nos cards de câmera
-- Sidebar se oculta ao entrar em fullscreen e restaura ao sair
-- Drag-and-drop aplica a ordem automaticamente (sem precisar clicar em Aplicar)
-- Escala tipográfica legível: 11–17px (mínimo 11px para badges, 13px para texto principal)
-
----
-
-## cameras-v23.html — Config API
-
-Versão para deploy no servidor. Idêntica à v22 com a camada de persistência trocada.
-
-### Diferenças em relação à v22
-
-| | v22 | v23 |
+| Estado | Indicador | Descrição |
 |---|---|---|
-| Persistência primária | localStorage | Config API (`POST /config`) |
-| Fallback | — | localStorage |
-| Compartilhamento entre dispositivos | Não | Sim |
-| Indicador de status | Não | Sim (API / SAVING / ERRO / LOCAL) |
-| Funciona via `file://` | Sim | Sim (modo local automático) |
+| `API` verde | Conectado e sincronizado com o servidor |
+| `API` amarelo | Salvando no servidor (debounce 800ms) |
+| `ERRO` vermelho | Config API não respondeu — usando localStorage |
+| `LOCAL` cinza | Modo `file://` ou API indisponível |
 
-### Lógica de persistência
+### Como acessar
 
-1. **Abertura:** tenta `GET http://hostname:1985/config` com timeout 3s → se falhar, usa localStorage
-2. **Save:** grava localStorage imediatamente + debounce 800ms para POST na API
-3. **Migração:** lê `go2rtc_v22` do localStorage automaticamente na primeira abertura
-4. **`file://`:** detecta o protocolo e usa localStorage puro, sem tentar a API
-
-### Indicador no header
-
-| Estado | Cor | Quando |
-|---|---|---|
-| `API` verde | Conectado e sincronizado |
-| `API` amarelo piscando | Salvando no servidor |
-| `ERRO` vermelho | API não respondeu |
-| `LOCAL` cinza | Modo local (`file://` ou API indisponível) |
+```
+http://<ip-do-servidor>:1984/cameras-v23.html
+```
 
 ---
 
 ## install.sh — Instalador Ubuntu Server
 
 ### Uso básico
+
 ```bash
-# Na mesma pasta que cameras-v23.html
+# Na mesma pasta que cameras-v23.html e setup.html
 sudo bash install.sh
 ```
 
 ### Uso com Tailscale (headless, sem interação)
+
 ```bash
 TAILSCALE_AUTHKEY=tskey-auth-xxxx sudo bash install.sh
 ```
@@ -101,7 +114,7 @@ TAILSCALE_AUTHKEY=tskey-auth-xxxx sudo bash install.sh
 5. Cria `go2rtc.yaml` com `static_dir` apontando para `www/` (não sobrescreve se existir)
 6. Cria `config.json` vazio (não sobrescreve se existir)
 7. Cria `config-api.py` — servidor HTTP com GET/POST `/config` e escrita atômica
-8. Copia `cameras-v23.html` — tenta local → GitHub → placeholder
+8. Copia `cameras-v23.html` e `setup.html` — tenta local → GitHub → placeholder
 9. Configura permissões mínimas para o usuário `go2rtc`
 10. Cria e ativa dois serviços systemd
 11. Abre portas no `ufw` se estiver ativo
@@ -113,46 +126,59 @@ TAILSCALE_AUTHKEY=tskey-auth-xxxx sudo bash install.sh
 ```
 /opt/go2rtc/
 ├── go2rtc              # binário
-├── go2rtc.yaml         # configuração
+├── go2rtc.yaml         # configuração (streams adicionados pelo setup.html)
 ├── config.json         # câmeras e servidores (gravado pela Config API)
 ├── config-api.py       # servidor Python — GET/POST /config
 └── www/
-    └── cameras-v23.html
+    ├── setup.html       # wizard de configuração
+    └── cameras-v23.html # monitor de câmeras
 ```
 
 ### Serviços systemd
 
-| Serviço | Descrição |
-|---|---|
-| `go2rtc` | Servidor de streaming, porta 1984 |
-| `go2rtc-config-api` | Config API Python, porta 1985 |
+| Serviço | Porta | Descrição |
+|---|---|---|
+| `go2rtc` | 1984 | Servidor de streaming + API |
+| `go2rtc-config-api` | 1985 | Config API Python |
 
 ```bash
-# Gerenciar
-systemctl status  go2rtc go2rtc-config-api
-systemctl restart go2rtc go2rtc-config-api
-systemctl stop    go2rtc go2rtc-config-api
+# Status
+systemctl status go2rtc go2rtc-config-api
 
-# Logs
+# Reiniciar
+systemctl restart go2rtc go2rtc-config-api
+
+# Logs em tempo real
 journalctl -u go2rtc -f
 journalctl -u go2rtc-config-api -f
 ```
 
 ### Configurar antes de publicar no GitHub
 
-Editar `install.sh` linha:
+Editar `install.sh` linha 24:
 ```bash
-GITHUB_REPO="https://raw.githubusercontent.com/SEU_USUARIO/SEU_REPO/main"
+GITHUB_REPO="https://raw.githubusercontent.com/drbitgestor-code/Bit2Cam/main"
 ```
 
-Após preencher, o script baixa `cameras-v23.html` automaticamente do repositório  
-quando não encontrar o arquivo na pasta local.
+Após preencher, o script baixa `cameras-v23.html` e `setup.html` automaticamente
+quando não encontrar os arquivos na pasta local.
+
+---
+
+## API go2rtc utilizada
+
+| Endpoint | Método | Uso |
+|---|---|---|
+| `/api/streams` | GET | Lista streams ativos — usado pelo monitor |
+| `/api/onvif` | GET | WS-Discovery multicast — usado pelo setup wizard |
+| `/api/onvif?src=onvif://...` | GET | Proba câmera e retorna perfis — usado pelo wizard |
+| `/api/streams?name=...&src=...` | PUT | Adiciona stream e persiste no YAML — usado pelo wizard |
 
 ---
 
 ## Arquitetura multi-servidor
 
-Cada máquina com go2rtc tem sua própria instalação independente.  
+Cada máquina com go2rtc tem sua própria instalação independente.
 O monitor agrega câmeras de todos os servidores cadastrados.
 
 ```
@@ -161,20 +187,19 @@ go2rtc Depósito     (192.168.2.10:1984)  ←─┤── Monitor (cameras-v23.h
 go2rtc Filial Sul   (192.168.3.10:1984)  ←─┘
 ```
 
-Cada nó tem seu próprio `config.json` local.  
-A lista de servidores é configurada no monitor e salva via Config API do nó acessado.
+Cada nó tem seu próprio `go2rtc.yaml` e `config.json`.
+O wizard `setup.html` é executado uma vez por nó para configurar as câmeras locais.
 
 ### Acesso remoto via Tailscale
 
-Após instalação com auth key, cada nó aparece no Tailnet com hostname `go2rtc-<maquina>`.  
-O monitor pode ser acessado remotamente sem abrir portas publicamente:
+```bash
+# Instalação com Tailscale
+TAILSCALE_AUTHKEY=tskey-auth-xxxx sudo bash install.sh
 
+# Após instalação, acessar pelo IP Tailscale
+http://<tailscale-ip>:1984/setup.html       # configuração inicial
+http://<tailscale-ip>:1984/cameras-v23.html # monitoramento
 ```
-http://<tailscale-ip>:1984/cameras-v23.html
-```
-
-O flag `--ssh` habilitado durante `tailscale up` permite acesso SSH ao nó  
-via Tailscale sem precisar expor a porta 22 publicamente.
 
 ---
 
@@ -183,4 +208,4 @@ via Tailscale sem precisar expor a porta 22 publicamente.
 - [ ] Publicar repositório no GitHub e preencher `GITHUB_REPO` no `install.sh`
 - [ ] Gerar auth keys no Tailscale Admin para cada nó remoto
 - [ ] Adaptar `install.sh` para Windows (script `.bat` + `config-api.exe` via PyInstaller)
-- [ ] Script de atualização (`update.sh`) — baixa nova versão do HTML sem reinstalar tudo
+- [ ] Script de atualização (`update.sh`) — baixa nova versão dos HTMLs sem reinstalar tudo
