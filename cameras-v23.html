@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GO2RTC Monitor V23</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Exo+2:wght@300;400;600;700&family=Orbitron:wght@600;700&display=swap');
+
+  :root {
+    --bg:#080c10; --bg2:#0d1117; --bg3:#111820; --panel:#0a1520;
+    --border:#1a2f45; --accent:#00d4ff; --accent-dim:rgba(0,212,255,0.12);
+    --danger:#ff3b3b; --success:#00ff88; --warn:#ffcc00;
+    --text:#c8dce8; --text-dim:#4a6a80;
+    --mono:'JetBrains Mono',monospace; --sans:'Exo 2',sans-serif; --display:'Orbitron','JetBrains Mono',monospace;
+    --sidebar-w:280px;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans); height:100vh; overflow:hidden; display:flex; flex-direction:column; }
+
+  /* HEADER */
+  header { display:flex; align-items:center; justify-content:space-between; padding:0 14px; height:50px; background:var(--panel); border-bottom:1px solid var(--border); flex-shrink:0; z-index:200; gap:10px; }
+  .header-left, .header-right { display:flex; align-items:center; gap:8px; }
+  .logo { font-family:var(--display); font-size:14px; color:var(--accent); letter-spacing:0.15em; white-space:nowrap; text-shadow:0 0 10px rgba(0,212,255,0.5); }
+  .logo-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent); margin-right:7px; animation:blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  .btn-icon { background:var(--bg3); border:1px solid var(--border); color:var(--accent); padding:5px 11px; cursor:pointer; border-radius:3px; font-family:var(--mono); font-size:13px; transition:.2s ease-out; white-space:nowrap; touch-action:manipulation; }
+  .btn-icon:hover { background:var(--accent-dim); border-color:var(--accent); }
+  .btn-icon:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .btn-icon.success { color:var(--success); border-color:rgba(0,255,136,0.3); }
+  .btn-icon.success:hover { background:rgba(0,255,136,0.1); border-color:var(--success); }
+  .btn-icon.danger { color:var(--danger); }
+  #clock { font-family:var(--mono); font-size:15px; color:var(--accent); min-width:62px; }
+
+  /* LAYOUT */
+  .layout { display:flex; flex:1; overflow:hidden; }
+
+  /* SIDEBAR */
+  .sidebar { width:var(--sidebar-w); flex-shrink:0; background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; transition:margin-left .3s ease; }
+  body.sidebar-hidden .sidebar { margin-left:calc(var(--sidebar-w) * -1); }
+
+  .sidebar-hdr { padding:9px 12px; border-bottom:1px solid var(--border); font-family:var(--mono); font-size:13px; color:var(--text-dim); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+  .sidebar-hdr b { color:var(--accent); font-weight:normal; }
+
+  .sidebar-search { padding:7px 10px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  .sidebar-search input { width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:3px; padding:5px 8px; color:var(--text); font-family:var(--mono); font-size:14px; outline:none; transition:border-color .2s; }
+  .sidebar-search input:focus { border-color:var(--accent); }
+  .sidebar-search input::placeholder { color:var(--text-dim); }
+
+  .sidebar-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+  .tab-btn { flex:1; padding:8px; background:transparent; border:none; font-family:var(--mono); font-size:12px; color:var(--text-dim); cursor:pointer; border-bottom:2px solid transparent; transition:.15s ease-out; letter-spacing:0.04em; touch-action:manipulation; }
+  .tab-btn:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+  .tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); background:var(--accent-dim); }
+
+  /* ALL LIST */
+  .cam-list { flex:1; overflow-y:auto; display:none; }
+  .cam-list.visible { display:block; }
+  .cam-list::-webkit-scrollbar { width:3px; }
+  .cam-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+  .srv-group-hdr { display:flex; align-items:center; justify-content:space-between; padding:6px 12px; background:var(--bg3); border-bottom:1px solid var(--border); border-top:1px solid var(--border); position:sticky; top:0; z-index:5; }
+  .srv-group-name { font-family:var(--mono); font-size:13px; letter-spacing:0.08em; }
+  .srv-group-count { font-family:var(--mono); font-size:12px; color:var(--text-dim); }
+
+  .cam-list-item { display:flex; align-items:center; gap:8px; padding:7px 12px; border-left:3px solid transparent; border-bottom:1px solid rgba(255,255,255,0.02); cursor:pointer; transition:background .15s; }
+  .cam-list-item:hover { background:var(--accent-dim); }
+  .cam-list-item.active { background:var(--accent-dim); }
+  .item-color { width:8px; height:8px; min-width:8px; min-height:8px; border-radius:50%; flex-shrink:0; }
+  .item-info { flex:1; min-width:0; }
+  .item-name { font-family:var(--mono); font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .item-id   { font-family:var(--mono); font-size:12px; color:var(--text-dim); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Badge HD */
+  .hd-badge { font-family:var(--mono); font-size:11px; padding:1px 4px; border-radius:2px; background:rgba(0,212,255,0.15); color:var(--accent); border:1px solid rgba(0,212,255,0.3); flex-shrink:0; }
+
+  .item-btn { width:20px; height:20px; border-radius:50%; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; transition:all .15s ease-out; touch-action:manipulation; }
+  .item-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .cam-list-item.active .item-btn { border-color:var(--danger); color:var(--danger); }
+  .cam-list-item:not(.active) .item-btn:hover { border-color:var(--success); color:var(--success); }
+
+  /* DRAG LIST */
+  .drag-pane { flex:1; overflow:hidden; display:none; flex-direction:column; }
+  .drag-pane.visible { display:flex; }
+  .drag-hint { padding:5px 12px; font-family:var(--mono); font-size:12px; color:var(--text-dim); border-bottom:1px solid var(--border); flex-shrink:0; }
+  .drag-list { flex:1; overflow-y:auto; }
+  .drag-list::-webkit-scrollbar { width:3px; }
+
+  .drag-item { display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid rgba(255,255,255,0.02); border-left:3px solid; cursor:grab; user-select:none; }
+  .drag-item:active { cursor:grabbing; }
+  .drag-item.dragging { opacity:.35; }
+  .drag-item.drag-over { border-top:2px solid var(--accent); }
+  .drag-handle { color:var(--text-dim); font-size:17px; flex-shrink:0; }
+  .drag-num  { font-family:var(--mono); font-size:12px; color:var(--text-dim); width:16px; text-align:center; flex-shrink:0; }
+  .drag-info { flex:1; min-width:0; }
+  .drag-name { font-family:var(--mono); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .drag-srv  { font-family:var(--mono); font-size:12px; color:var(--text-dim); margin-top:1px; }
+  .drag-remove { width:18px; height:18px; border-radius:50%; border:1px solid rgba(255,59,59,0.4); background:transparent; color:var(--danger); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; transition:all .15s ease-out; touch-action:manipulation; }
+  .drag-remove:focus-visible { outline:2px solid var(--danger); outline-offset:2px; }
+  .drag-remove:hover { background:rgba(255,59,59,0.15); border-color:var(--danger); }
+  .drag-empty { padding:24px 16px; text-align:center; font-family:var(--mono); font-size:13px; color:var(--text-dim); line-height:1.9; }
+
+  .sidebar-footer { padding:8px 10px; border-top:1px solid var(--border); display:flex; gap:6px; flex-shrink:0; }
+  .btn-sm { flex:1; padding:5px; background:var(--bg3); border:1px solid var(--border); color:var(--text-dim); font-family:var(--mono); font-size:12px; border-radius:3px; cursor:pointer; transition:all .15s ease-out; text-align:center; touch-action:manipulation; }
+  .btn-sm:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-sm:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .btn-sm.danger:hover { border-color:var(--danger); color:var(--danger); }
+  .version-tag { padding:5px; font-family:var(--mono); font-size:12px; color:var(--text-dim); border-top:1px solid var(--border); text-align:center; }
+
+  /* CONTENT */
+  .content { flex:1; background:#000; position:relative; overflow:hidden; }
+  .empty-state { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:var(--text-dim); font-family:var(--mono); font-size:14px; text-align:center; }
+  .empty-state svg { opacity:.1; }
+  .empty-state p { line-height:2; opacity:.6; }
+
+  #camera-grid { display:grid; width:100%; height:100%; gap:2px; padding:2px; grid-auto-rows:1fr; }
+  .cam-card { position:relative; width:100%; height:100%; background:#000; overflow:hidden; transition:box-shadow .25s ease-out; }
+  .cam-card:hover { box-shadow:inset 0 0 0 1px rgba(0,212,255,0.5), 0 0 20px rgba(0,212,255,0.08); z-index:1; }
+  .cam-card::after { content:''; position:absolute; inset:0; background:repeating-linear-gradient(to bottom,transparent 0px,transparent 3px,rgba(0,0,0,0.06) 3px,rgba(0,0,0,0.06) 4px); pointer-events:none; z-index:3; }
+  .cam-card iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:none; }
+
+  .cam-label { position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.75); padding:2px 7px 2px 5px; font-family:var(--mono); font-size:13px; z-index:10; border-radius:3px; pointer-events:none; display:flex; align-items:center; gap:5px; }
+  .cam-label-dot  { width:6px; height:6px; min-width:6px; border-radius:50%; flex-shrink:0; }
+  .cam-label-text { color:var(--accent); }
+  .cam-label-srv  { color:var(--text-dim); font-size:11px; }
+  .cam-label-hd   { font-size:11px; padding:1px 3px; background:rgba(0,212,255,0.15); color:var(--accent); border:1px solid rgba(0,212,255,0.3); border-radius:2px; }
+
+  .cam-btn-wrap { position:absolute; top:6px; right:6px; display:flex; gap:4px; opacity:0; transition:.2s; z-index:100; }
+  .cam-card:hover .cam-btn-wrap { opacity:1; }
+  .cam-btn { width:24px; height:24px; background:rgba(0,0,0,0.8); border-radius:3px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:15px; transition:.15s ease-out; border:1px solid rgba(255,255,255,0.15); color:var(--text); touch-action:manipulation; }
+  .cam-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .cam-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .cam-btn.remove { border-color:rgba(255,59,59,0.4); color:var(--danger); }
+  .cam-btn.remove:hover { background:rgba(255,59,59,0.2); border-color:var(--danger); }
+  .cam-overlay { position:absolute; inset:0; z-index:50; cursor:pointer; }
+  .cam-overlay:hover + .cam-btn-wrap, .cam-card:hover .cam-btn-wrap { opacity:1; }
+
+  /* FULLSCREEN MODAL */
+  .fs-overlay { position:fixed; inset:0; background:#000; z-index:500; display:none; flex-direction:column; }
+  .fs-overlay.open { display:flex; }
+  .fs-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--border); flex-shrink:0; }
+  .fs-title { font-family:var(--mono); font-size:15px; color:var(--accent); display:flex; align-items:center; gap:8px; }
+  .fs-body { flex:1; position:relative; }
+  .fs-body iframe { position:absolute; inset:0; width:100%; height:100%; border:none; }
+  .fs-overlay-block { position:absolute; inset:0; z-index:10; }
+  .fs-footer { padding:8px 16px; background:var(--panel); border-top:1px solid var(--border); font-family:var(--mono); font-size:13px; color:var(--text-dim); display:flex; align-items:center; gap:12px; flex-shrink:0; }
+  .fs-quality { display:flex; align-items:center; gap:5px; }
+  .fs-dot { width:6px; height:6px; border-radius:50%; background:var(--success); box-shadow:0 0 5px var(--success); }
+
+  /* MODAL CONFIG */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.88); display:none; align-items:center; justify-content:center; z-index:1000; }
+  .modal-overlay.show { display:flex; }
+  .modal { background:var(--panel); border:1px solid var(--border); width:95%; max-width:680px; max-height:90vh; border-radius:6px; display:flex; flex-direction:column; overflow:hidden; }
+  .modal-header { padding:13px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+  .modal-header span { color:var(--accent); font-family:var(--mono); font-size:15px; letter-spacing:.08em; }
+  .modal-body { padding:16px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:14px; }
+  .modal-footer { padding:12px 16px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; flex-shrink:0; }
+
+  .section-title { font-family:var(--mono); font-size:13px; color:var(--text-dim); letter-spacing:.08em; padding-bottom:6px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .input-row { display:flex; gap:6px; }
+  .input-ui { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:7px 9px; border-radius:3px; font-family:var(--mono); font-size:14px; outline:none; transition:border-color .2s; }
+  .input-ui:focus { border-color:var(--accent); }
+
+  .mgr-list { border:1px solid var(--border); border-radius:4px; background:rgba(0,0,0,0.2); max-height:140px; overflow-y:auto; }
+  .mgr-list::-webkit-scrollbar { width:3px; }
+  .mgr-item { display:flex; align-items:center; gap:8px; padding:7px 12px; border-bottom:1px solid rgba(255,255,255,0.04); font-family:var(--mono); font-size:13px; }
+  .mgr-item input { background:var(--bg3); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:13px; outline:none; flex:1; min-width:0; padding:3px 6px; border-radius:3px; transition:border-color .2s; }
+  .mgr-item input:focus { border-color:var(--accent); }
+  .mgr-item span  { color:var(--text-dim); font-size:12px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .mgr-dot { width:8px; height:8px; min-width:8px; min-height:8px; border-radius:50%; flex-shrink:0; display:inline-block; }
+  .mgr-item .mgr-dot { flex:none; }
+
+  .import-box { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:12px; display:flex; flex-direction:column; gap:8px; }
+  .import-status { font-family:var(--mono); font-size:13px; min-height:15px; }
+  .import-status.ok   { color:var(--success); }
+  .import-status.err  { color:var(--danger); }
+  .import-status.warn { color:var(--warn); }
+
+  .json-area { background:var(--bg); border:1px solid var(--border); color:var(--text-dim); padding:8px; font-family:var(--mono); font-size:13px; border-radius:3px; resize:vertical; min-height:42px; outline:none; width:100%; }
+  .btn-row { display:flex; gap:6px; flex-wrap:wrap; }
+
+  .toast { position:fixed; bottom:20px; right:20px; background:var(--panel); border:1px solid var(--border); padding:10px 16px; font-family:var(--mono); font-size:14px; border-radius:4px; z-index:9999; opacity:0; transition:opacity .3s; pointer-events:none; }
+  .toast.show { opacity:1; }
+  .toast.ok   { border-color:var(--success); color:var(--success); }
+  .toast.err  { border-color:var(--danger);  color:var(--danger); }
+  .toast.warn { border-color:var(--warn);    color:var(--warn); }
+
+  /* API STATUS INDICATOR */
+  #api-indicator { display:flex; align-items:center; gap:4px; font-family:var(--mono); font-size:12px; color:var(--text-dim); letter-spacing:.05em; user-select:none; }
+  #api-indicator .api-dot { width:6px; height:6px; min-width:6px; border-radius:50%; background:var(--text-dim); transition:background .3s, box-shadow .3s; }
+  #api-indicator[data-state="ok"]     .api-dot { background:var(--success); box-shadow:0 0 5px var(--success); }
+  #api-indicator[data-state="ok"]              { color:var(--success); }
+  #api-indicator[data-state="saving"] .api-dot { background:var(--warn); animation:blink .7s infinite; }
+  #api-indicator[data-state="saving"]          { color:var(--warn); }
+  #api-indicator[data-state="error"]  .api-dot { background:var(--danger); }
+  #api-indicator[data-state="error"]           { color:var(--danger); }
+  #api-indicator[data-state="local"]  .api-dot { background:var(--text-dim); }
+
+  /* FULLSCREEN AUTO-HIDE HEADER */
+  body.fs-mode header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 210;
+    transform: translateY(-101%);
+    transition: transform .3s cubic-bezier(.4,0,1,1);
+  }
+  body.fs-mode header.header-revealed {
+    transform: translateY(0);
+    transition: transform .22s cubic-bezier(0,0,.2,1);
+    box-shadow: 0 4px 32px rgba(0,0,0,.96), 0 1px 0 rgba(0,212,255,.25) inset;
+  }
+  #hot-zone {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 6px;
+    z-index: 211;
+    cursor: default;
+  }
+  body.fs-mode #hot-zone { display: block; }
+
+  /* ACCESSIBILITY */
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:2px; }
+  @media (prefers-reduced-motion: reduce) {
+    .logo-dot { animation:none !important; }
+    .scan-progress-bar { transition:none !important; }
+    *, *::before, *::after { transition-duration:.01ms !important; animation-duration:.01ms !important; }
+  }
+
+  /* SCAN */
+  .scan-progress-wrap { height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .scan-progress-bar  { height:100%; background:var(--accent); width:0%; transition:width .25s; }
+  .scan-status-txt    { font-family:var(--mono); font-size:13px; color:var(--text-dim); min-height:14px; }
+  .scan-result-list   { border:1px solid var(--border); border-radius:4px; background:rgba(0,0,0,.2); max-height:130px; overflow-y:auto; }
+  .scan-result-list::-webkit-scrollbar { width:3px; }
+  .scan-result-list::-webkit-scrollbar-thumb { background:var(--border); }
+  .scan-result-item   { display:flex; align-items:center; gap:8px; padding:6px 12px; border-bottom:1px solid rgba(255,255,255,.04); font-family:var(--mono); font-size:13px; }
+  .scan-result-item:last-child { border-bottom:none; }
+  .scan-badge  { font-size:11px; padding:1px 4px; border-radius:2px; flex-shrink:0; }
+  .badge-ok    { background:rgba(0,255,136,.15);  color:var(--success); border:1px solid rgba(0,255,136,.3); }
+  .badge-warn  { background:rgba(255,204,0,.12);  color:var(--warn);    border:1px solid rgba(255,204,0,.3); }
+  .scan-url    { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .scan-url.ok { color:var(--success); }
+  .scan-url.nc { color:var(--warn); }
+  .scan-hint   { font-size:12px; color:var(--text-dim); flex-shrink:0; }
+</style>
+</head>
+<body>
+
+<div id="hot-zone" aria-hidden="true"></div>
+
+<header>
+  <div class="header-left">
+    <button class="btn-icon" onclick="toggleSidebar()" aria-label="Alternar barra lateral" type="button">☰</button>
+    <div class="logo"><span class="logo-dot"></span>GO2RTC MONITOR</div>
+    <button class="btn-icon" onclick="openSettings()" type="button">⚙ CONFIG</button>
+  </div>
+  <div class="header-right">
+    <button class="btn-icon success" onclick="applySelection()" type="button">▶ APLICAR</button>
+    <button class="btn-icon" id="btn-fullscreen" onclick="togglePageFullscreen()" title="Tela cheia" aria-label="Tela cheia" type="button">⛶</button>
+    <div id="api-indicator" data-state="local" title="Modo local — Config API não encontrada">
+      <span class="api-dot"></span><span id="api-indicator-label">LOCAL</span>
+    </div>
+    <div id="clock">00:00:00</div>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-hdr">
+      <span>CÂMERAS</span>
+      <b id="sel-count">0 selecionadas</b>
+    </div>
+    <div class="sidebar-search">
+      <input type="text" id="search-input" placeholder="🔍 buscar por nome ou id..." oninput="renderAllList()">
+    </div>
+    <div class="sidebar-tabs">
+      <button class="tab-btn active" id="tab-all-btn" onclick="switchTab('all')">TODAS</button>
+      <button class="tab-btn"        id="tab-sel-btn" onclick="switchTab('sel')">ORDEM ▸ DRAG</button>
+    </div>
+    <div class="cam-list visible" id="list-all"></div>
+    <div class="drag-pane" id="drag-pane">
+      <div class="drag-hint">⠿ arraste para reordenar · ordem reflete no grid</div>
+      <div class="drag-list" id="list-selected"></div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="btn-sm" onclick="selectAll()">+ TODAS</button>
+      <button class="btn-sm danger" onclick="clearAll()">✕ LIMPAR</button>
+    </div>
+    <div class="version-tag">GO2RTC MONITOR · v23 · api sync</div>
+  </div>
+
+  <div class="content">
+    <div class="empty-state" id="empty-state">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+        <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+      </svg>
+      <p>Nenhuma câmera selecionada<br>
+      Configure em <strong style="color:var(--accent)">⚙ CONFIG</strong> e importe<br>
+      Câmeras com <strong style="color:var(--accent)">HD</strong> trocam para alta resolução no fullscreen</p>
+    </div>
+    <div id="camera-grid"></div>
+  </div>
+</div>
+
+<!-- FULLSCREEN MODAL -->
+<div class="fs-overlay" id="fs-overlay">
+  <div class="fs-header">
+    <div class="fs-title">
+      <span id="fs-dot" style="width:8px;height:8px;border-radius:50%;flex-shrink:0;"></span>
+      <span id="fs-name">CÂMERA</span>
+      <span id="fs-badge"></span>
+    </div>
+    <button class="btn-icon" onclick="closeFullscreen()" type="button" aria-label="Fechar fullscreen">✕ FECHAR [ESC]</button>
+  </div>
+  <div class="fs-body">
+    <iframe id="fs-iframe" src=""></iframe>
+    <div class="fs-overlay-block"></div>
+  </div>
+  <div class="fs-footer">
+    <div class="fs-quality">
+      <div class="fs-dot"></div>
+      <span id="fs-quality-label">STREAM ATIVO</span>
+    </div>
+    <span id="fs-srv" style="margin-left:auto;"></span>
+  </div>
+</div>
+
+<!-- MODAL CONFIG -->
+<div class="modal-overlay" id="modal-settings">
+  <div class="modal">
+    <div class="modal-header">
+      <span>⚙ CONFIGURAÇÃO</span>
+      <button onclick="closeSettings()" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:16px;" type="button" aria-label="Fechar configurações">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div>
+        <div class="section-title">SERVIDORES GO2RTC</div>
+        <div class="input-row" style="margin-top:8px;">
+          <input type="text" id="new-srv-name" class="input-ui" placeholder="Nome (ex: Loja Centro)" style="flex:1">
+          <input type="text" id="new-srv-url"  class="input-ui" placeholder="http://192.168.0.x:1984" style="flex:2">
+          <button class="btn-icon success" onclick="addServer()">+ ADD</button>
+        </div>
+        <div class="mgr-list" id="srv-list" style="margin-top:6px;"></div>
+      </div>
+
+      <div>
+        <div class="section-title">
+          <span>DESCOBRIR SERVIDORES NA REDE</span>
+          <span style="font-family:var(--mono);font-size:12px;color:var(--text-dim);">porta 1984 padrão go2rtc</span>
+        </div>
+        <div style="margin-top:8px; display:flex; flex-direction:column; gap:7px;">
+          <div class="input-row">
+            <input type="text" id="scan-subnet" class="input-ui" placeholder="192.168.1  (detectando...)" style="flex:3" title="Subrede /24 — preenche automaticamente">
+            <input type="number" id="scan-port" class="input-ui" value="1984" min="1" max="65535" style="flex:1;min-width:64px;" title="Porta go2rtc" inputmode="numeric">
+            <button class="btn-icon" id="scan-btn" onclick="startNetworkScan()">🔍 SCAN</button>
+          </div>
+          <div class="scan-progress-wrap" id="scan-progress-wrap" style="display:none;"><div class="scan-progress-bar" id="scan-progress-bar"></div></div>
+          <div class="scan-status-txt" id="scan-status-txt" role="status" aria-live="polite"></div>
+          <div class="scan-result-list" id="scan-result-list" style="display:none;"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">IMPORTAR CÂMERAS VIA API</div>
+        <div class="import-box" style="margin-top:8px;">
+          <div style="font-family:var(--mono); font-size:13px; color:var(--text-dim); line-height:1.6;">
+            Detecta automaticamente câmeras com dual stream pelo sufixo <code style="color:var(--accent)">_hd</code>.<br>
+            Ex: <code style="color:var(--accent)">Baia1</code> + <code style="color:var(--accent)">Baia1_hd</code> → badge <strong style="color:var(--accent)">HD</strong> na câmera, fullscreen em alta resolução.
+          </div>
+          <div class="input-row">
+            <select id="import-srv-sel" class="input-ui" style="flex:1;"></select>
+            <button class="btn-icon" onclick="importFromAPI()">⬇ IMPORTAR</button>
+          </div>
+          <div class="import-status" id="api-status"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">ADICIONAR CÂMERA MANUALMENTE</div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+          <div class="input-row">
+            <input type="text" id="new-cam-name" class="input-ui" placeholder="Nome" style="flex:1">
+            <input type="text" id="new-cam-id"   class="input-ui" placeholder="ID go2rtc (stream principal)" style="flex:1">
+          </div>
+          <div class="input-row">
+            <input type="text" id="new-cam-hd" class="input-ui" placeholder="ID HD (opcional, ex: Baia1_hd)" style="flex:2">
+            <select id="new-cam-srv" class="input-ui" style="flex:1;"></select>
+            <button class="btn-icon success" onclick="addManualCam()">+ ADD</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">
+          <span>CÂMERAS CADASTRADAS</span>
+          <span id="mgr-count" style="color:var(--accent); font-size:13px;"></span>
+        </div>
+        <div class="mgr-list" id="mgr-cam-list" style="margin-top:8px;"></div>
+      </div>
+
+      <div>
+        <div class="section-title">BACKUP / RESTAURAR</div>
+        <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+          <textarea class="json-area" id="cfg-json" placeholder="Cole aqui um código exportado..."></textarea>
+          <div class="btn-row">
+            <button class="btn-icon" onclick="exportConfig()">📋 GERAR CÓDIGO</button>
+            <button class="btn-icon" onclick="importConfig()">📥 IMPORTAR CÓDIGO</button>
+            <button class="btn-icon success" onclick="generateStandalone()">💾 GERAR ARQUIVO CLIENTE</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn-icon danger" onclick="clearAllCameras()" type="button">🗑 LIMPAR CÂMERAS</button>
+      <button class="btn-icon success" onclick="closeSettings()" type="button">✔ SALVAR E FECHAR</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SRV_COLORS = ['#00d4ff','#00ff88','#ffcc00','#ff6b6b','#b48eff','#ff9f43','#54a0ff','#ff6b9d'];
+const HD_SUFFIX  = '_hd'; // convenção de sufixo para stream HD
+
+let config = {
+  servers: [],
+  cameras: [],      // {uid, id, hdId, name, srvId}  hdId=null se não tiver dual stream
+  selectedUids: []
+};
+
+const STANDALONE_DATA = null;
+const STORAGE_KEY = 'go2rtc_v23';
+const STORAGE_KEY_LEGACY = 'go2rtc_v22'; // migração automática da v22
+let currentTab = 'all';
+let dragSrcIdx = null;
+
+// ── PERSIST ──────────────────────────────────────────────────────
+// ── CONFIG API ───────────────────────────────────────────────────
+const CONFIG_API_PORT = 1985;
+
+function getConfigAPIUrl() {
+  if (window.location.protocol === 'file:') return null;
+  return `http://${window.location.hostname}:${CONFIG_API_PORT}/config`;
+}
+
+function setApiState(state, hint) {
+  const el  = document.getElementById('api-indicator');
+  const lbl = document.getElementById('api-indicator-label');
+  if (!el || !lbl) return;
+  el.dataset.state = state;
+  const labels = { ok:'API', saving:'API', error:'ERRO', local:'LOCAL' };
+  const titles  = {
+    ok:     'Config sincronizada com o servidor',
+    saving: 'Salvando no servidor...',
+    error:  hint || 'Config API indisponível — usando localStorage',
+    local:  'Modo local (file:// ou API não encontrada)',
+  };
+  lbl.textContent = labels[state] || state;
+  el.title = titles[state] || '';
+}
+
+// ── PERSIST ──────────────────────────────────────────────────────
+let _saveDebounce = null;
+
+function save() {
+  // localStorage como cache imediato
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(config)); } catch(e) {}
+  // API com debounce para não disparar a cada clique
+  const apiUrl = getConfigAPIUrl();
+  if (!apiUrl) return;
+  clearTimeout(_saveDebounce);
+  _saveDebounce = setTimeout(() => _pushToApi(apiUrl), 800);
+}
+
+async function _pushToApi(apiUrl) {
+  setApiState('saving');
+  try {
+    const res = await fetch(apiUrl, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(config),
+      signal:  AbortSignal.timeout(5000),
+    });
+    setApiState(res.ok ? 'ok' : 'error', `HTTP ${res.status}`);
+  } catch(e) {
+    setApiState('error', e.message);
+  }
+}
+
+async function load() {
+  const apiUrl = getConfigAPIUrl();
+  let fromApi  = false;
+
+  if (STANDALONE_DATA) {
+    config  = STANDALONE_DATA;
+  } else if (apiUrl) {
+    try {
+      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.servers)) {
+          config  = data;
+          fromApi = true;
+          // espelha no localStorage como cache
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(config)); } catch(e) {}
+        }
+      }
+    } catch(e) {
+      // API indisponível — fallback para localStorage
+    }
+
+    if (!fromApi) {
+      const s = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE_KEY_LEGACY);
+      try { if (s) config = JSON.parse(s); } catch(e) {}
+    }
+  } else {
+    const s = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE_KEY_LEGACY);
+    try { if (s) config = JSON.parse(s); } catch(e) {}
+  }
+
+  if (!config.servers)      config.servers      = [];
+  if (!config.cameras)      config.cameras      = [];
+  if (!config.selectedUids) config.selectedUids = [];
+
+  setApiState(fromApi ? 'ok' : (apiUrl ? 'error' : 'local'));
+
+  renderAllList(); renderDragList(); updateSelCount();
+  if (config.selectedUids.length > 0) applySelection();
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function uid()       { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function srvColor(srvId) { const i = config.servers.findIndex(s=>s.id===srvId); return SRV_COLORS[i%SRV_COLORS.length]||'#fff'; }
+function srvName(srvId)  { const s = config.servers.find(s=>s.id===srvId); return s?s.name:'?'; }
+function srvUrl(srvId)   { const s = config.servers.find(s=>s.id===srvId); return s?s.url:''; }
+function streamUrl(srvId, streamId) {
+  const base = srvUrl(srvId);
+  if (!/^https?:\/\//i.test(base)) return 'about:blank';
+  return `${base}/stream.html?src=${encodeURIComponent(streamId)}&mode=webrtc,mse,hls,mjpeg`;
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── TOAST ────────────────────────────────────────────────────────
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast show ${type}`;
+  setTimeout(()=>el.classList.remove('show'), 3200);
+}
+
+// ── TABS ─────────────────────────────────────────────────────────
+function switchTab(t) {
+  currentTab = t;
+  document.getElementById('list-all').classList.toggle('visible', t==='all');
+  document.getElementById('drag-pane').classList.toggle('visible', t==='sel');
+  document.getElementById('tab-all-btn').classList.toggle('active', t==='all');
+  document.getElementById('tab-sel-btn').classList.toggle('active', t==='sel');
+  if (t==='sel') renderDragList();
+}
+
+function toggleSidebar() { document.body.classList.toggle('sidebar-hidden'); }
+
+// ── PAGE FULLSCREEN ──────────────────────────────────────────────
+let _sidebarStateBeforeFS = false;
+
+function togglePageFullscreen() {
+  if (!document.fullscreenElement) {
+    _sidebarStateBeforeFS = document.body.classList.contains('sidebar-hidden');
+    document.documentElement.requestFullscreen().catch(e => toast(`Fullscreen: ${e.message}`, 'err'));
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+document.addEventListener('fullscreenchange', () => {
+  const btn = document.getElementById('btn-fullscreen');
+  const hdr = document.querySelector('header');
+  if (document.fullscreenElement) {
+    document.body.classList.add('sidebar-hidden', 'fs-mode');
+    if (btn) { btn.textContent = '⊡'; btn.title = 'Sair da tela cheia'; btn.setAttribute('aria-label', 'Sair da tela cheia'); }
+  } else {
+    document.body.classList.remove('fs-mode');
+    document.body.classList.toggle('sidebar-hidden', _sidebarStateBeforeFS);
+    hdr.classList.remove('header-revealed');
+    clearTimeout(_headerTimer);
+    if (btn) { btn.textContent = '⛶'; btn.title = 'Tela cheia'; btn.setAttribute('aria-label', 'Tela cheia'); }
+  }
+});
+
+// ── HOT CORNER / AUTO-HIDE HEADER ────────────────────────────────
+let _headerTimer = null;
+
+function _revealHeader() {
+  clearTimeout(_headerTimer);
+  document.querySelector('header').classList.add('header-revealed');
+}
+
+function _scheduleHideHeader() {
+  clearTimeout(_headerTimer);
+  _headerTimer = setTimeout(() => {
+    if (document.fullscreenElement)
+      document.querySelector('header').classList.remove('header-revealed');
+  }, 2000);
+}
+
+document.getElementById('hot-zone').addEventListener('mouseenter', _revealHeader);
+document.querySelector('header').addEventListener('mouseenter', _revealHeader);
+document.querySelector('header').addEventListener('mouseleave', _scheduleHideHeader);
+
+// ── SERVERS ──────────────────────────────────────────────────────
+function addServer() {
+  const name = document.getElementById('new-srv-name').value.trim();
+  const url  = document.getElementById('new-srv-url').value.trim().replace(/\/$/, '');
+  if (!name || !url) { toast('Preencha nome e URL.','err'); return; }
+  config.servers.push({ id:uid(), name, url });
+  document.getElementById('new-srv-name').value = '';
+  document.getElementById('new-srv-url').value  = '';
+  save(); renderSrvList(); renderSrvSelects();
+  toast(`Servidor "${name}" adicionado!`);
+}
+
+function removeServer(srvId) {
+  if (config.servers.length <= 1) { toast('Mantenha ao menos 1 servidor.','warn'); return; }
+  const toRemove = config.cameras.filter(c=>c.srvId===srvId).map(c=>c.uid);
+  config.cameras      = config.cameras.filter(c=>c.srvId!==srvId);
+  config.selectedUids = config.selectedUids.filter(u=>!toRemove.includes(u));
+  config.servers      = config.servers.filter(s=>s.id!==srvId);
+  save(); renderSrvList(); renderSrvSelects(); renderAllList(); renderDragList(); updateSelCount();
+  toast('Servidor removido.');
+}
+
+function renderSrvList() {
+  const list = document.getElementById('srv-list');
+  list.innerHTML = '';
+  if (config.servers.length===0) {
+    list.innerHTML=`<div class="mgr-item" style="color:var(--text-dim);">Nenhum servidor.</div>`; return;
+  }
+  config.servers.forEach((s,i) => {
+    const color = SRV_COLORS[i%SRV_COLORS.length];
+    const item  = document.createElement('div');
+    item.className = 'mgr-item';
+    item.innerHTML = `
+      <span class="mgr-dot" style="background:${color};"></span>
+      <input type="text" value="${esc(s.name)}" onchange="config.servers.find(x=>x.id==='${s.id}').name=this.value;save();renderAllList();renderDragList();">
+      <span title="${esc(s.url)}">${esc(s.url)}</span>
+      <button style="color:var(--danger);border:none;background:none;cursor:pointer;font-size:16px;flex-shrink:0;" onclick="removeServer('${s.id}')">✕</button>
+    `;
+    list.appendChild(item);
+  });
+}
+
+function renderSrvSelects() {
+  ['import-srv-sel','new-cam-srv'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = config.servers.length===0
+      ? `<option value="">— adicione um servidor —</option>`
+      : config.servers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  });
+}
+
+// ── IMPORT API ───────────────────────────────────────────────────
+async function importFromAPI() {
+  const srvId  = document.getElementById('import-srv-sel').value;
+  const status = document.getElementById('api-status');
+  const srv    = config.servers.find(s=>s.id===srvId);
+  if (!srv) { status.className='import-status err'; status.textContent='✕ Selecione um servidor.'; return; }
+
+  status.className='import-status warn';
+  status.textContent=`⟳ Conectando em ${srv.name}...`;
+
+  try {
+    const res  = await fetch(`${srv.url}/api/streams`, {signal:AbortSignal.timeout(8000)});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const ids  = Object.keys(data);
+    if (ids.length===0) { status.className='import-status warn'; status.textContent='⚠ Nenhum stream encontrado.'; return; }
+
+    // Separa streams normais dos _hd
+    const hdIds     = ids.filter(id => id.endsWith(HD_SUFFIX));
+    const normalIds = ids.filter(id => !id.endsWith(HD_SUFFIX));
+
+    let added = 0;
+    normalIds.forEach(id => {
+      // Não duplica mesmo id no mesmo servidor
+      if (config.cameras.find(c=>c.id===id && c.srvId===srvId)) return;
+
+      // Detecta se existe par _hd
+      const hdId = hdIds.includes(id + HD_SUFFIX) ? id + HD_SUFFIX : null;
+
+      const name = id.replace(/camera_/i,'').replace(/[_-]/g,' ').replace(/\b\w/g,l=>l.toUpperCase()).trim() || id;
+      config.cameras.push({ uid:uid(), id, hdId, name, srvId });
+      added++;
+    });
+
+    const hdCount = config.cameras.filter(c=>c.srvId===srvId && c.hdId).length;
+    save(); renderCamList(); renderAllList();
+    status.className='import-status ok';
+    status.textContent=`✔ ${srv.name} · ${added} câmeras importadas · ${hdCount} com dual stream (HD)`;
+    toast(`${added} câmeras de "${srv.name}"!`);
+  } catch(e) {
+    status.className='import-status err';
+    status.textContent = e.name==='TimeoutError'
+      ? '✕ Timeout — verifique endereço e CORS (origin: "*").'
+      : `✕ ${e.message}`;
+  }
+}
+
+// ── MANUAL ───────────────────────────────────────────────────────
+function addManualCam() {
+  const name  = document.getElementById('new-cam-name').value.trim();
+  const id    = document.getElementById('new-cam-id').value.trim();
+  const hdId  = document.getElementById('new-cam-hd').value.trim() || null;
+  const srvId = document.getElementById('new-cam-srv').value;
+  if (!name||!id) { toast('Preencha nome e ID.','err'); return; }
+  if (!srvId)     { toast('Selecione um servidor.','err'); return; }
+  if (config.cameras.find(c=>c.id===id && c.srvId===srvId)) { toast('Câmera já cadastrada.','err'); return; }
+  config.cameras.push({ uid:uid(), id, hdId, name, srvId });
+  document.getElementById('new-cam-name').value='';
+  document.getElementById('new-cam-id').value='';
+  document.getElementById('new-cam-hd').value='';
+  save(); renderCamList(); renderAllList();
+  toast('Câmera adicionada!');
+}
+
+function removeCam(camUid) {
+  config.cameras      = config.cameras.filter(c=>c.uid!==camUid);
+  config.selectedUids = config.selectedUids.filter(u=>u!==camUid);
+  save(); renderCamList(); renderAllList(); renderDragList(); updateSelCount();
+}
+
+function clearAllCameras() {
+  if (!confirm('Remover todas as câmeras?')) return;
+  config.cameras=[]; config.selectedUids=[];
+  save(); renderCamList(); renderAllList(); renderDragList(); updateSelCount();
+  toast('Lista limpa.');
+}
+
+function renderCamList() {
+  const list = document.getElementById('mgr-cam-list');
+  document.getElementById('mgr-count').textContent=`${config.cameras.length} câmeras`;
+  list.innerHTML='';
+  if (config.cameras.length===0) {
+    list.innerHTML=`<div class="mgr-item" style="color:var(--text-dim);">Nenhuma câmera.</div>`; return;
+  }
+  config.servers.forEach((srv,si) => {
+    const cams  = config.cameras.filter(c=>c.srvId===srv.id);
+    if (!cams.length) return;
+    const color = SRV_COLORS[si%SRV_COLORS.length];
+    const hdr   = document.createElement('div');
+    hdr.style.cssText=`padding:4px 12px;font-family:var(--mono);font-size:12px;color:${color};background:var(--bg3);border-bottom:1px solid var(--border);`;
+    hdr.textContent=`▸ ${srv.name.toUpperCase()}`;
+    list.appendChild(hdr);
+    cams.forEach(cam => {
+      const item = document.createElement('div');
+      item.className='mgr-item';
+      item.innerHTML=`
+        <span class="mgr-dot" style="background:${color};"></span>
+        <input type="text" value="${esc(cam.name)}" onchange="config.cameras.find(c=>c.uid==='${cam.uid}').name=this.value;save();renderAllList();renderDragList();">
+        <span title="${esc(cam.id)}">${esc(cam.id)}${cam.hdId?` + ${esc(cam.hdId)}`:''}</span>
+        ${cam.hdId?`<span style="color:var(--accent);font-size:11px;border:1px solid rgba(0,212,255,0.3);padding:1px 3px;border-radius:2px;flex-shrink:0;">HD</span>`:''}
+        <button style="color:var(--danger);border:none;background:none;cursor:pointer;font-size:16px;flex-shrink:0;" onclick="removeCam('${cam.uid}')">✕</button>
+      `;
+      list.appendChild(item);
+    });
+  });
+}
+
+// ── SIDEBAR LIST ─────────────────────────────────────────────────
+function renderAllList() {
+  const q    = document.getElementById('search-input').value.toLowerCase().trim();
+  const list = document.getElementById('list-all');
+  list.innerHTML='';
+
+  if (config.cameras.length===0) {
+    list.innerHTML=`<div style="padding:20px;text-align:center;font-family:var(--mono);font-size:13px;color:var(--text-dim);line-height:1.9;">Nenhuma câmera.<br>Use <strong style="color:var(--accent)">⚙ CONFIG</strong> para importar.</div>`;
+    return;
+  }
+
+  let hasResult = false;
+  config.servers.forEach((srv,si) => {
+    const color = SRV_COLORS[si%SRV_COLORS.length];
+    let cams = config.cameras.filter(c=>c.srvId===srv.id);
+    if (q) cams = cams.filter(c=>c.name.toLowerCase().includes(q)||c.id.toLowerCase().includes(q));
+    if (!cams.length) return;
+    hasResult = true;
+
+    const selInSrv = cams.filter(c=>config.selectedUids.includes(c.uid)).length;
+    const hdr = document.createElement('div');
+    hdr.className='srv-group-hdr';
+    hdr.innerHTML=`<span class="srv-group-name" style="color:${color};">● ${esc(srv.name)}</span><span class="srv-group-count">${selInSrv}/${cams.length} sel.</span>`;
+    list.appendChild(hdr);
+
+    cams.forEach(cam => {
+      const active = config.selectedUids.includes(cam.uid);
+      const item   = document.createElement('div');
+      item.className=`cam-list-item${active?' active':''}`;
+      item.id=`li-${cam.uid}`;
+      item.style.borderLeftColor = active ? color : 'transparent';
+      item.innerHTML=`
+        <span class="item-color" style="background:${color};opacity:${active?1:0.3};"></span>
+        <div class="item-info">
+          <div class="item-name">${esc(cam.name)}</div>
+          <div class="item-id">${esc(cam.id)}</div>
+        </div>
+        ${cam.hdId?`<span class="hd-badge">HD</span>`:''}
+        <button class="item-btn" onclick="toggleCam('${cam.uid}',event)">${active?'✕':'+'}</button>
+      `;
+      list.appendChild(item);
+    });
+  });
+
+  if (!hasResult) list.innerHTML=`<div style="padding:16px;text-align:center;font-family:var(--mono);font-size:13px;color:var(--text-dim);">Nenhum resultado.</div>`;
+}
+
+function renderDragList() {
+  const list = document.getElementById('list-selected');
+  list.innerHTML='';
+  if (!config.selectedUids.length) {
+    list.innerHTML=`<div class="drag-empty">Nenhuma câmera selecionada.<br>Vá em <strong style="color:var(--accent)">TODAS</strong> e clique +</div>`; return;
+  }
+  config.selectedUids.forEach((camUid,idx) => {
+    const cam   = config.cameras.find(c=>c.uid===camUid);
+    if (!cam) return;
+    const si    = config.servers.findIndex(s=>s.id===cam.srvId);
+    const color = SRV_COLORS[si%SRV_COLORS.length]||'#fff';
+    const item  = document.createElement('div');
+    item.className='drag-item';
+    item.draggable=true;
+    item.dataset.index=idx;
+    item.style.borderLeftColor=color;
+    item.style.background='rgba(0,0,0,0.2)';
+    item.innerHTML=`
+      <span class="drag-handle">⠿</span>
+      <span class="drag-num">${idx+1}</span>
+      <div class="drag-info">
+        <div class="drag-name" style="color:${color};">${esc(cam.name)}${cam.hdId?` <span style="font-size:11px;color:var(--accent);border:1px solid rgba(0,212,255,0.3);padding:1px 3px;border-radius:2px;">HD</span>`:''}
+        </div>
+        <div class="drag-srv">${esc(srvName(cam.srvId))}</div>
+      </div>
+      <button class="drag-remove" onclick="toggleCam('${camUid}',event)">✕</button>
+    `;
+    item.addEventListener('dragstart', e=>{dragSrcIdx=idx;item.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+    item.addEventListener('dragover',  e=>{e.preventDefault();document.querySelectorAll('.drag-item').forEach(el=>el.classList.remove('drag-over'));item.classList.add('drag-over');});
+    item.addEventListener('dragleave', ()=>item.classList.remove('drag-over'));
+    item.addEventListener('drop', e=>{
+      e.preventDefault();
+      if (dragSrcIdx===null||dragSrcIdx===idx) return;
+      const moved=config.selectedUids.splice(dragSrcIdx,1)[0];
+      config.selectedUids.splice(idx,0,moved);
+      save();renderDragList();updateSelCount();applySelection();
+    });
+    item.addEventListener('dragend',()=>{document.querySelectorAll('.drag-item').forEach(el=>el.classList.remove('dragging','drag-over'));dragSrcIdx=null;});
+    list.appendChild(item);
+  });
+}
+
+function updateSelCount() {
+  const n=config.selectedUids.length;
+  document.getElementById('sel-count').textContent=`${n} selecionada${n!==1?'s':''}`;
+  document.getElementById('tab-sel-btn').textContent=`ORDEM (${n}) ▸ DRAG`;
+}
+
+function updateListItem(camUid) {
+  const cam    = config.cameras.find(c=>c.uid===camUid);
+  const active = config.selectedUids.includes(camUid);
+  const item   = document.getElementById(`li-${camUid}`);
+  if (!item) return;
+  item.classList.toggle('active',active);
+  const si=config.servers.findIndex(s=>s.id===cam?.srvId);
+  const color=SRV_COLORS[si%SRV_COLORS.length]||'#fff';
+  item.style.borderLeftColor=active?color:'transparent';
+  const dot=item.querySelector('.item-color');
+  if (dot) dot.style.opacity=active?'1':'0.3';
+  const btn=item.querySelector('.item-btn');
+  if (btn) btn.textContent=active?'✕':'+';
+}
+
+function toggleCam(camUid,e) {
+  e&&e.stopPropagation();
+  config.selectedUids=config.selectedUids.includes(camUid)
+    ?config.selectedUids.filter(u=>u!==camUid)
+    :[...config.selectedUids,camUid];
+  updateListItem(camUid);updateSelCount();
+  if (currentTab==='sel') renderDragList();
+  save();
+}
+
+function selectAll() { config.selectedUids=config.cameras.map(c=>c.uid);renderAllList();renderDragList();updateSelCount();save(); }
+function clearAll()  { config.selectedUids=[];renderAllList();renderDragList();updateSelCount();save();applySelection(); }
+
+// ── APPLY ────────────────────────────────────────────────────────
+function applySelection() {
+  const grid  = document.getElementById('camera-grid');
+  const empty = document.getElementById('empty-state');
+  const count = config.selectedUids.length;
+
+  grid.querySelectorAll('iframe').forEach(f=>f.src='');
+  empty.style.display=count===0?'flex':'none';
+  grid.innerHTML='';
+  if (!count) return;
+
+  const cols=Math.ceil(Math.sqrt(count));
+  const rows=Math.ceil(count/cols);
+  grid.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+  grid.style.gridTemplateRows=`repeat(${rows},1fr)`;
+
+  config.selectedUids.forEach(camUid=>{
+    const cam   = config.cameras.find(c=>c.uid===camUid);
+    if (!cam) return;
+    const si    = config.servers.findIndex(s=>s.id===cam.srvId);
+    const color = SRV_COLORS[si%SRV_COLORS.length]||'#fff';
+    const card  = document.createElement('div');
+    card.className='cam-card';
+    card.innerHTML=`
+      <div class="cam-label">
+        <span class="cam-label-dot" style="background:${color};"></span>
+        <span class="cam-label-text">${esc(cam.name)}</span>
+        <span class="cam-label-srv">${esc(srvName(cam.srvId))}</span>
+        ${cam.hdId?`<span class="cam-label-hd">HD</span>`:''}
+      </div>
+      <iframe src="${streamUrl(cam.srvId,cam.id)}" loading="lazy"></iframe>
+      <div class="cam-overlay" onclick="openFullscreen('${cam.uid}')" title="${cam.hdId?'Clique para fullscreen em HD':'Clique para fullscreen'}"></div>
+      <div class="cam-btn-wrap">
+        <button class="cam-btn remove" onclick="event.stopPropagation();toggleCam('${camUid}');applySelection();" title="Remover">✕</button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ── FULLSCREEN ───────────────────────────────────────────────────
+function openFullscreen(camUid) {
+  const cam   = config.cameras.find(c=>c.uid===camUid);
+  if (!cam) return;
+  const si    = config.servers.findIndex(s=>s.id===cam.srvId);
+  const color = SRV_COLORS[si%SRV_COLORS.length]||'#fff';
+  const isHD  = !!cam.hdId;
+  const streamId = isHD ? cam.hdId : cam.id;
+
+  document.getElementById('fs-dot').style.background   = color;
+  document.getElementById('fs-name').textContent        = cam.name;
+  document.getElementById('fs-badge').innerHTML         = isHD ? `<span style="font-size:12px;padding:2px 5px;background:rgba(0,212,255,0.15);color:var(--accent);border:1px solid rgba(0,212,255,0.3);border-radius:2px;margin-left:4px;">ALTA RESOLUÇÃO</span>` : '';
+  document.getElementById('fs-quality-label').textContent = isHD ? 'STREAM HD · ALTA RESOLUÇÃO' : 'STREAM PADRÃO';
+  document.getElementById('fs-srv').textContent         = srvName(cam.srvId);
+  document.getElementById('fs-iframe').src              = streamUrl(cam.srvId, streamId);
+  document.getElementById('fs-overlay').classList.add('open');
+}
+
+function closeFullscreen() {
+  document.getElementById('fs-overlay').classList.remove('open');
+  document.getElementById('fs-iframe').src='';
+}
+
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeFullscreen(); });
+
+// ── MODAL ────────────────────────────────────────────────────────
+function openSettings() {
+  document.getElementById('api-status').textContent='';
+  renderSrvList();renderSrvSelects();renderCamList();
+  document.getElementById('modal-settings').classList.add('show');
+  // Auto-fill subnet field if still empty
+  const subnetEl = document.getElementById('scan-subnet');
+  if (!subnetEl.value) {
+    getLocalSubnet().then(sub => { if (sub) subnetEl.value = sub; });
+  }
+}
+function closeSettings() { document.getElementById('modal-settings').classList.remove('show');save();renderAllList(); }
+
+// ── BACKUP ───────────────────────────────────────────────────────
+function exportConfig() { document.getElementById('cfg-json').value=btoa(JSON.stringify(config));toast('Código gerado.'); }
+
+function importConfig() {
+  try {
+    const parsed=JSON.parse(atob(document.getElementById('cfg-json').value.trim()));
+    if (!parsed||typeof parsed!=='object') throw new Error();
+    if (!Array.isArray(parsed.servers)||!Array.isArray(parsed.cameras)||!Array.isArray(parsed.selectedUids)) throw new Error();
+    config=parsed;
+    save();renderSrvList();renderSrvSelects();renderCamList();renderAllList();renderDragList();updateSelCount();
+    toast('Config importada!');
+  } catch(e) { toast('Código inválido!','err'); }
+}
+
+function generateStandalone() {
+  const html=document.documentElement.outerHTML;
+  const data=`const STANDALONE_DATA = ${JSON.stringify(config)};`;
+  const out =html.replace('const STANDALONE_DATA = null;',data);
+  const blob=new Blob([out],{type:'text/html'});
+  const link=document.createElement('a');
+  link.href=URL.createObjectURL(blob);link.download='monitor_go2rtc_v22.html';link.click();
+  toast('Arquivo do cliente gerado!');
+}
+
+// ── NETWORK SCAN ─────────────────────────────────────────────────
+async function getLocalSubnet() {
+  return new Promise(resolve => {
+    try {
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      pc.createDataChannel('');
+      pc.createOffer().then(o => pc.setLocalDescription(o)).catch(() => resolve(null));
+      pc.onicecandidate = ev => {
+        if (!ev?.candidate?.candidate) return;
+        const m = /(\d{1,3}(?:\.\d{1,3}){3})/.exec(ev.candidate.candidate);
+        if (m && !m[1].startsWith('169.254') && !m[1].startsWith('127.')) {
+          resolve(m[1].split('.').slice(0,3).join('.'));
+          try { pc.close(); } catch(_) {}
+        }
+      };
+      setTimeout(() => resolve(null), 2500);
+    } catch(e) { resolve(null); }
+  });
+}
+
+async function probeGo2RTC(ip, port, timeout=2000) {
+  const url = `http://${ip}:${port}`;
+  // Attempt 1: full CORS fetch → confirms go2rtc ready to use
+  try {
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), timeout);
+    const res  = await fetch(`${url}/api/streams`, { signal: ctrl.signal });
+    clearTimeout(tid);
+    if (res.ok) {
+      const data = await res.json();
+      return { url, corsOk: true, streams: Object.keys(data).length };
+    }
+  } catch(e) {
+    if (e.name === 'AbortError') return null;
+    // CORS error or other — fall through to no-cors probe
+  }
+  // Attempt 2: no-cors probe → detects open port even without CORS
+  try {
+    const ctrl2 = new AbortController();
+    const tid2  = setTimeout(() => ctrl2.abort(), timeout);
+    await fetch(`${url}/`, { signal: ctrl2.signal, mode: 'no-cors' });
+    clearTimeout(tid2);
+    return { url, corsOk: false, streams: 0 };
+  } catch(e) {
+    return null;
+  }
+}
+
+let _scanAbort = false;
+
+async function startNetworkScan() {
+  const btn    = document.getElementById('scan-btn');
+  const status = document.getElementById('scan-status-txt');
+  const bar    = document.getElementById('scan-progress-bar');
+  const wrap   = document.getElementById('scan-progress-wrap');
+  const list   = document.getElementById('scan-result-list');
+
+  // STOP button
+  if (btn.dataset.scanning === '1') { _scanAbort = true; return; }
+
+  // Auto-detect subnet if empty
+  let subnet = document.getElementById('scan-subnet').value.trim();
+  if (!subnet) {
+    status.textContent = '⟳ Detectando subrede...';
+    subnet = await getLocalSubnet();
+    if (subnet) document.getElementById('scan-subnet').value = subnet;
+    else { subnet = '192.168.1'; document.getElementById('scan-subnet').value = subnet; }
+  }
+
+  const port = parseInt(document.getElementById('scan-port').value) || 1984;
+
+  _scanAbort = false;
+  btn.dataset.scanning = '1';
+  btn.textContent = '⏹ PARAR';
+
+  wrap.style.display = 'block';
+  bar.style.width    = '0%';
+  list.style.display = 'none';
+  list.innerHTML     = '';
+  status.textContent = '';
+
+  // Build host list: localhost first, then subnet /24
+  const hosts = ['127.0.0.1'];
+  for (let i = 1; i <= 254; i++) hosts.push(`${subnet}.${i}`);
+
+  const total = hosts.length;
+  let done = 0, found = 0;
+  const BATCH = 40;
+
+  for (let i = 0; i < total && !_scanAbort; i += BATCH) {
+    const batch   = hosts.slice(i, i + BATCH);
+    const results = await Promise.all(batch.map(ip => probeGo2RTC(ip, port)));
+    results.forEach(r => {
+      done++;
+      if (r) {
+        found++;
+        appendScanResult(r, list);
+        if (list.style.display === 'none') list.style.display = 'block';
+      }
+    });
+    bar.style.width    = `${Math.round(done / total * 100)}%`;
+    status.textContent = `⟳ ${subnet}.x:${port} — ${done}/${total} — ${found} encontrado(s)`;
+  }
+
+  btn.dataset.scanning = '0';
+  btn.textContent = '🔍 SCAN';
+  bar.style.width = '100%';
+  status.textContent = _scanAbort
+    ? `⏹ Interrompido · ${found} servidor(es) encontrado(s)`
+    : found
+      ? `✔ Scan concluído · ${found} servidor(es) go2rtc encontrado(s)`
+      : `✕ Nenhum servidor encontrado em ${subnet}.x:${port}`;
+}
+
+function appendScanResult(srv, list) {
+  const already = config.servers.some(s => s.url === srv.url);
+  const item = document.createElement('div');
+  item.className = 'scan-result-item';
+  item.id = `scan-${btoa(srv.url)}`;
+  const badgeCls  = srv.corsOk ? 'badge-ok' : 'badge-warn';
+  const badgeTxt  = srv.corsOk ? 'GO2RTC' : 'PORTA ABERTA';
+  const urlCls    = srv.corsOk ? 'ok' : 'nc';
+  const infoTxt   = srv.corsOk
+    ? `<span class="scan-hint">${srv.streams} stream${srv.streams!==1?'s':''}</span>`
+    : `<span class="scan-hint" title="Configure origin:* no go2rtc">sem CORS</span>`;
+  const actionTxt = already
+    ? `<span class="scan-hint">já adicionado</span>`
+    : `<button class="btn-icon success" style="font-size:12px;padding:2px 7px;" onclick="addScannedServer('${esc(srv.url)}',this)">+ ADD</button>`;
+  item.innerHTML = `
+    <span class="scan-badge ${badgeCls}">${badgeTxt}</span>
+    <span class="scan-url ${urlCls}" title="${esc(srv.url)}">${esc(srv.url)}</span>
+    ${infoTxt}
+    ${actionTxt}
+  `;
+  list.appendChild(item);
+}
+
+function addScannedServer(url, btn) {
+  const label = url.replace(/^https?:\/\//, '');
+  config.servers.push({ id: uid(), name: `go2rtc (${label})`, url });
+  save(); renderSrvList(); renderSrvSelects();
+  btn.textContent = '✔';
+  btn.disabled    = true;
+  btn.classList.remove('success');
+  toast(`Servidor ${label} adicionado!`);
+}
+
+// ── CLOCK ────────────────────────────────────────────────────────
+setInterval(()=>{ document.getElementById('clock').textContent=new Date().toLocaleTimeString('pt-BR',{hour12:false}); },1000);
+
+// ── INIT ─────────────────────────────────────────────────────────
+load();
+</script>
+</body>
+</html>
