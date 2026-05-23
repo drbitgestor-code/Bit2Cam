@@ -80,6 +80,12 @@
   .cam-list-item.active .item-btn { border-color:var(--danger); color:var(--danger); }
   .cam-list-item:not(.active) .item-btn:hover { border-color:var(--success); color:var(--success); }
 
+  /* RENAME */
+  .rename-btn { width:20px; height:20px; border-radius:50%; border:1px solid var(--border); background:transparent; color:var(--text-dim); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; transition:all .15s ease-out; touch-action:manipulation; }
+  .rename-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .rename-btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .rename-input { background:var(--bg3); border:1px solid var(--accent); color:var(--text); padding:2px 5px; border-radius:3px; font-family:var(--mono); font-size:13px; outline:none; width:100%; }
+
   /* DRAG LIST */
   .drag-pane { flex:1; overflow:hidden; display:none; flex-direction:column; }
   .drag-pane.visible { display:flex; }
@@ -557,6 +563,7 @@ function renderAllList() {
           <div class="item-id">${esc(cam.id)}</div>
         </div>
         ${cam.hdId?`<span class="hd-badge">HD</span>`:''}
+        <button class="rename-btn" onclick="startRename('${cam.uid}',event)" title="Renomear câmera">✎</button>
         <button class="item-btn" onclick="toggleCam('${cam.uid}',event)">${active?'✕':'+'}</button>
       `;
       list.appendChild(item);
@@ -710,6 +717,119 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeFullscreen()
 
 // ── CLOCK ────────────────────────────────────────────────────────
 setInterval(()=>{ document.getElementById('clock').textContent=new Date().toLocaleTimeString('pt-BR',{hour12:false}); },1000);
+
+// ── RENAME ───────────────────────────────────────────────────────
+function toStreamName(s) {
+  return (s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'_')
+    .replace(/^_+|_+$/g,'') || 'cam_'+uid().slice(-4);
+}
+
+function extractSrcFromYaml(yaml, streamName) {
+  const esc2 = streamName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const lines = yaml.split('\n');
+  for (let i=0;i<lines.length;i++) {
+    const inl = lines[i].match(new RegExp('^\\s{2}'+esc2+':\\s+(.+)'));
+    if (inl) return inl[1].trim();
+    if (new RegExp('^\\s{2}'+esc2+':\\s*$').test(lines[i])) {
+      for (let j=i+1;j<lines.length;j++) {
+        const m=lines[j].match(/^\s+-\s+(.+)/);
+        if (m) return m[1].trim();
+        if (/^\S/.test(lines[j])) break;
+      }
+    }
+  }
+  return null;
+}
+
+function startRename(camUid, e) {
+  e&&e.stopPropagation();
+  const cam=config.cameras.find(c=>c.uid===camUid);
+  if (!cam) return;
+  const item=document.getElementById(`li-${camUid}`);
+  if (!item) return;
+  const info=item.querySelector('.item-info');
+  if (!info||info.querySelector('.rename-input')) return;
+
+  const input=document.createElement('input');
+  input.className='rename-input';
+  input.value=cam.name;
+  input.onclick=e=>e.stopPropagation();
+  input.onkeydown=e=>{
+    if (e.key==='Enter')  { e.preventDefault(); input.onblur=null; doRename(cam,input.value.trim()); }
+    if (e.key==='Escape') { input.onblur=null; renderAllList(); }
+  };
+  input.onblur=()=>{ const v=input.value.trim(); if(v&&v!==cam.name) doRename(cam,v); else renderAllList(); };
+  info.innerHTML='';
+  info.appendChild(input);
+  input.focus(); input.select();
+}
+
+async function doRename(cam, newName) {
+  if (!newName||newName===cam.name) { renderAllList(); return; }
+
+  const newId   = toStreamName(newName);
+  const oldId   = cam.id;
+  const srvBase = srvUrl(cam.srvId);
+
+  if (newId===oldId) {
+    cam.name=newName;
+    save(); renderAllList(); renderDragList(); applySelection();
+    toast(`Renomeado para "${newName}"`, 'ok');
+    return;
+  }
+
+  let camSrc=cam.src;
+  if (!camSrc) {
+    try {
+      const r=await fetch(`${srvBase}/api/config`,{signal:AbortSignal.timeout(5000)});
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      camSrc=extractSrcFromYaml(await r.text(), oldId);
+    } catch(e) { toast(`Erro ao buscar config: ${e.message}`,'err'); renderAllList(); return; }
+    if (!camSrc) { toast(`Fonte do stream "${oldId}" não encontrada`,'err'); renderAllList(); return; }
+    cam.src=camSrc;
+  }
+
+  toast('Renomeando…','warn');
+
+  try {
+    const del=await fetch(`${srvBase}/api/streams?src=${encodeURIComponent(oldId)}`,
+      {method:'DELETE',signal:AbortSignal.timeout(5000)});
+    if (!del.ok&&del.status!==404) throw new Error(`DELETE: HTTP ${del.status}`);
+
+    const put=await fetch(
+      `${srvBase}/api/streams?name=${encodeURIComponent(newId)}&src=${encodeURIComponent(camSrc)}`,
+      {method:'PUT',signal:AbortSignal.timeout(5000)});
+    if (!put.ok) {
+      await fetch(`${srvBase}/api/streams?name=${encodeURIComponent(oldId)}&src=${encodeURIComponent(camSrc)}`,
+        {method:'PUT',signal:AbortSignal.timeout(5000)}).catch(()=>{});
+      throw new Error(`PUT: HTTP ${put.status}`);
+    }
+  } catch(e) { toast(`Erro ao renomear: ${e.message}`,'err'); renderAllList(); return; }
+
+  if (cam.hdId) {
+    const newHdId=newId+HD_SUFFIX;
+    let hdSrc=null;
+    try {
+      const r=await fetch(`${srvBase}/api/config`,{signal:AbortSignal.timeout(5000)});
+      if (r.ok) hdSrc=extractSrcFromYaml(await r.text(), cam.hdId);
+    } catch(e) {}
+    if (hdSrc) {
+      try {
+        await fetch(`${srvBase}/api/streams?src=${encodeURIComponent(cam.hdId)}`,
+          {method:'DELETE',signal:AbortSignal.timeout(5000)});
+        await fetch(`${srvBase}/api/streams?name=${encodeURIComponent(newHdId)}&src=${encodeURIComponent(hdSrc)}`,
+          {method:'PUT',signal:AbortSignal.timeout(5000)});
+      } catch(e) {}
+    }
+    cam.hdId=newHdId;
+  }
+
+  cam.id=newId; cam.name=newName;
+  save(); renderAllList(); renderDragList(); applySelection();
+  toast(`Renomeado para "${newName}"`, 'ok');
+}
 
 // ── INIT ─────────────────────────────────────────────────────────
 load();
