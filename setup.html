@@ -520,9 +520,15 @@ async function startScan() {
 
     } else if (raw && typeof raw === 'object') {
       if (Array.isArray(raw.sources)) {
-        // {"sources": ["onvif://ip"]}  — único dispositivo
-        const url = pickOnvif(raw.sources);
-        if (url) data = [{ url, name: '' }];
+        const first = raw.sources[0];
+        if (first && typeof first === 'object' && first.url) {
+          // {"sources": [{name, info, url}]}  ← formato real do go2rtc
+          data = raw.sources;
+        } else {
+          // {"sources": ["onvif://ip"]}  ← array de strings simples
+          const url = pickOnvif(raw.sources.filter(u => typeof u === 'string'));
+          if (url) data = [{ url, name: '' }];
+        }
       } else {
         // {"devname": val, ...}  — um ou mais dispositivos
         data = Object.entries(raw)
