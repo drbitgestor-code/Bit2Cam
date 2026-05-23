@@ -488,15 +488,38 @@ async function startScan() {
     const raw = await res.json();
     waveEl.classList.add('hidden');
 
-    // go2rtc pode retornar array [{url,name,...}] ou objeto {nome: [urls]}
+    // Normaliza resposta em [{url, name}], cobrindo todos os formatos do go2rtc:
+    //   Array   [{url, name, info}]               — formato v1.9+
+    //           [{sources:[...], name}]            — itens com campo sources
+    //   Objeto  {"sources": ["onvif://ip"]}        — único dispositivo descoberto
+    //           {"devname": ["onvif://..."], ...}  — chaves = nomes de dispositivos
     let data = [];
+
+    const pickOnvif = arr => arr.find(u => String(u).startsWith('onvif://')) || arr[0];
+
     if (Array.isArray(raw)) {
-      data = raw;
+      data = raw.map(item => {
+        const url = item.url
+          || (Array.isArray(item.sources) ? pickOnvif(item.sources) : null);
+        return { url: String(url || ''), name: item.name || item.info || '' };
+      }).filter(item => item.url);
+
     } else if (raw && typeof raw === 'object') {
-      data = Object.entries(raw).map(([name, val]) => ({
-        url: Array.isArray(val) ? (val.find(u => String(u).startsWith('onvif://')) || val[0]) : String(val),
-        name,
-      }));
+      if (Array.isArray(raw.sources)) {
+        // {"sources": ["onvif://ip", "rtsp://..."]} — um dispositivo
+        const url = pickOnvif(raw.sources);
+        if (url) data = [{ url: String(url), name: '' }];
+      } else {
+        // {"devname": [...urls], ...}
+        data = Object.entries(raw)
+          .filter(([k]) => !['producers','consumers','tracks'].includes(k))
+          .map(([name, val]) => {
+            const arr = Array.isArray(val) ? val : [String(val)];
+            const url = pickOnvif(arr);
+            return { url: String(url || ''), name };
+          })
+          .filter(item => item.url);
+      }
     }
 
     if (data.length === 0) {
@@ -534,12 +557,16 @@ async function startScan() {
 
 function parseOnvifUrl(url) {
   try {
+    // onvif://user:pass@host:port
     const m = url.match(/^onvif:\/\/([^@]*)@([^/:?#]+)(?::(\d+))?/);
     if (m) {
       const [, creds, host, port] = m;
       const [user = ''] = creds.split(':');
       return { user, host, port: port || '80' };
     }
+    // http://host:port/... (URL de serviço ONVIF raw)
+    const h = url.match(/^https?:\/\/([^/:?#]+)(?::(\d+))?/);
+    if (h) return { user: '', host: h[1], port: h[2] || '80' };
   } catch(_) {}
   return {};
 }
