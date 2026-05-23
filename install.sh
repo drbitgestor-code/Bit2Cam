@@ -21,7 +21,7 @@ SERVICE_USER="go2rtc"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # GitHub — substitua pelo seu repositório após publicar
-GITHUB_REPO="https://raw.githubusercontent.com/SEU_USUARIO/SEU_REPO/main"
+GITHUB_REPO="https://raw.githubusercontent.com/drbitgestor-code/Bit2Cam/main"
 
 # Tailscale — auth key opcional (pode ser passada como variável de ambiente)
 # Exemplo: TAILSCALE_AUTHKEY=tskey-auth-xxxx sudo bash install.sh
