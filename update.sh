@@ -99,7 +99,7 @@ do_update_html() {
   local current_hash
   current_hash=$(grep -oP "const SETUP_HASH = '\K[^']+" "$WWW_DIR/setup.html" 2>/dev/null || true)
 
-  _download_html "cameras-v23.html"
+  _download_html "bit2cam.html"
   _download_html "setup.html"
 
   # Re-injetar a senha preservada (ou manter a do arquivo baixado se não havia)

@@ -42,8 +42,8 @@ cat << 'BANNER'
    ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝   ╚═╝    ╚═════╝
 BANNER
 echo -e "${NC}"
-echo -e "  ${BOLD}GO2RTC Monitor — Instalador para Ubuntu Server${NC}"
-echo -e "  Monitor v23 · go2rtc + Config API + Sync JSON\n"
+echo -e "  ${BOLD}BIT2CAM — Instalador para Ubuntu Server${NC}"
+echo -e "  go2rtc + Config API + Sync JSON\n"
 
 # ── PRÉ-VERIFICAÇÕES ─────────────────────────────────────────────
 section "Verificações"
@@ -293,7 +293,7 @@ _copy_html() {
   fi
 }
 
-_copy_html "cameras-v23.html"
+_copy_html "bit2cam.html"
 _copy_html "setup.html"
 
 # Injetar hash da senha no setup.html
@@ -303,7 +303,7 @@ if [[ -f "$WWW_DIR/setup.html" ]]; then
   success "Senha do setup configurada"
 fi
 
-HTML_DEST="$WWW_DIR/cameras-v23.html"
+HTML_DEST="$WWW_DIR/bit2cam.html"
 
 # Placeholder caso o HTML não tenha chegado
 if [[ ! -f "$HTML_DEST" ]]; then
@@ -318,7 +318,7 @@ code{background:#0d1117;padding:6px 12px;border-radius:4px;border:1px solid #1a2
 <body>
 <h2>GO2RTC Monitor</h2>
 <p>Copie o arquivo do monitor para este servidor:</p>
-<code>scp cameras-v23.html usuario@servidor:/opt/go2rtc/www/</code>
+<code>scp bit2cam.html usuario@servidor:/opt/go2rtc/www/</code>
 </body></html>
 EOF
   info "Placeholder criado em $WWW_DIR/index.html"
@@ -482,13 +482,13 @@ echo -e "${GREEN}${BOLD}║         Instalação concluída com sucesso!        
 echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}Acesso local (LAN):${NC}"
-echo -e "    http://${LOCAL_IP}:${GO2RTC_PORT}/cameras-v23.html"
+echo -e "    http://${LOCAL_IP}:${GO2RTC_PORT}/bit2cam.html"
 echo -e "    go2rtc API:  http://${LOCAL_IP}:${GO2RTC_PORT}/api/streams"
 echo -e "    Config API:  http://${LOCAL_IP}:${CONFIG_API_PORT}/config"
 echo ""
 if [[ -n "$TAILSCALE_IP" ]]; then
   echo -e "  ${BOLD}Acesso remoto (Tailscale):${NC}"
-  echo -e "    http://${TAILSCALE_IP}:${GO2RTC_PORT}/cameras-v23.html"
+  echo -e "    http://${TAILSCALE_IP}:${GO2RTC_PORT}/bit2cam.html"
   echo -e "    go2rtc API:  http://${TAILSCALE_IP}:${GO2RTC_PORT}/api/streams"
   echo -e "    Config API:  http://${TAILSCALE_IP}:${CONFIG_API_PORT}/config"
   echo ""
@@ -499,7 +499,7 @@ fi
 echo ""
 echo -e "  ${BOLD}Arquivos:${NC}"
 echo -e "    Instalação:  ${INSTALL_DIR}"
-echo -e "    Monitor:     ${WWW_DIR}/cameras-v23.html"
+echo -e "    Monitor:     ${WWW_DIR}/bit2cam.html"
 echo -e "    Config:      ${CONFIG_JSON}"
 echo -e "    go2rtc.yaml: ${GO2RTC_YAML}"
 echo ""
@@ -512,5 +512,5 @@ echo -e "  ${BOLD}Logs em tempo real:${NC}"
 echo -e "    journalctl -u go2rtc -f"
 echo -e "    journalctl -u go2rtc-config-api -f"
 echo ""
-echo -e "  ${CYAN}Monitor v23${NC} · Config API sync · localStorage fallback"
+echo -e "  ${CYAN}BIT2CAM Monitor${NC} · Config API sync · localStorage fallback"
 echo ""

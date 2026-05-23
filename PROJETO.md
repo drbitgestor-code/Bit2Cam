@@ -7,7 +7,7 @@ Monitor de câmeras IP baseado em go2rtc, com wizard de configuração via ONVIF
 | Arquivo | Descrição |
 |---|---|
 | `setup.html` | Wizard técnico — descoberta ONVIF, configuração de streams, manutenção |
-| `cameras-v23.html` | Monitor do cliente — visualização em grid, renomeação de câmeras |
+| `bit2cam.html` | Monitor do cliente — visualização em grid, renomeação de câmeras |
 | `install.sh` | Instalador para Ubuntu Server headless |
 | `archive/cameras-v22.html` | Versão standalone anterior (referência) |
 
@@ -27,7 +27,7 @@ Monitor de câmeras IP baseado em go2rtc, com wizard de configuração via ONVIF
 | Perfil | URL | Permissões |
 |---|---|---|
 | **Técnico** | `/setup.html` | Descoberta ONVIF, adicionar/remover câmeras, manutenção |
-| **Cliente** | `/cameras-v23.html` | Visualizar câmeras, renomear câmeras |
+| **Cliente** | `/bit2cam.html` | Visualizar câmeras, renomear câmeras |
 
 `setup.html` deve ser protegido — cliente não deve ver nem acessar.
 
@@ -46,7 +46,7 @@ Monitor de câmeras IP baseado em go2rtc, com wizard de configuração via ONVIF
 ```
 1. sudo bash install.sh        → instala go2rtc + serviços
 2. http://host:1984/setup.html → técnico descobre câmeras e configura
-3. http://host:1984/cameras-v23.html → cliente monitora via Tailscale
+3. http://host:1984/bit2cam.html → cliente monitora via Tailscale
 ```
 
 ---
@@ -66,7 +66,7 @@ Wizard de 4 passos que usa a API nativa do go2rtc para descoberta ONVIF.
 
 ---
 
-## cameras-v23.html — Monitor do Cliente
+## bit2cam.html — Monitor do Cliente
 
 | Funcionalidade | Status |
 |---|---|
@@ -113,7 +113,7 @@ TAILSCALE_AUTHKEY=tskey-auth-xxxx sudo bash install.sh
 ├── config-api.py       # GET/POST /config na porta 1985
 └── www/
     ├── setup.html       # acesso técnico
-    └── cameras-v23.html # acesso cliente
+    └── bit2cam.html # acesso cliente
 ```
 
 ### Serviços systemd

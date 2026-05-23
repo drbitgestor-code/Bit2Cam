@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GO2RTC Monitor V23</title>
+<title>BIT2CAM Monitor</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Exo+2:wght@300;400;600;700&family=Orbitron:wght@600;700&display=swap');
 
@@ -293,7 +293,7 @@
       <button class="btn-sm" onclick="selectAll()">+ TODAS</button>
       <button class="btn-sm danger" onclick="clearAll()">✕ LIMPAR</button>
     </div>
-    <div class="version-tag">GO2RTC MONITOR · v23 · api sync</div>
+    <div class="version-tag" id="version-tag">BIT2CAM</div>
   </div>
 
   <div class="content">
@@ -345,8 +345,9 @@ let config = {
 };
 
 const STANDALONE_DATA = null;
-const STORAGE_KEY = 'go2rtc_v23';
-const STORAGE_KEY_LEGACY = 'go2rtc_v22'; // migração automática da v22
+const APP_VERSION = 'v23';
+const STORAGE_KEY = 'bit2cam';
+const STORAGE_KEY_LEGACY = 'go2rtc_v23'; // migração de instâncias antigas
 let currentTab = 'all';
 let dragSrcIdx = null;
 
@@ -832,6 +833,7 @@ async function doRename(cam, newName) {
 }
 
 // ── INIT ─────────────────────────────────────────────────────────
+document.getElementById('version-tag').textContent = `BIT2CAM · ${APP_VERSION}`;
 load();
 </script>
 </body>
