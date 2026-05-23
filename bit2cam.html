@@ -5,15 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BIT2CAM Monitor</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Exo+2:wght@300;400;600;700&family=Orbitron:wght@600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
   :root {
-    --bg:#080c10; --bg2:#0d1117; --bg3:#111820; --panel:#0a1520;
-    --border:#1a2f45; --accent:#00d4ff; --accent-dim:rgba(0,212,255,0.12);
-    --danger:#ff3b3b; --success:#00ff88; --warn:#ffcc00;
-    --text:#c8dce8; --text-dim:#4a6a80;
-    --mono:'JetBrains Mono',monospace; --sans:'Exo 2',sans-serif; --display:'Orbitron','JetBrains Mono',monospace;
+    --bg:#111827; --bg2:#1a2035; --bg3:#1f2d45; --panel:#151e2d;
+    --border:#2d3a52; --accent:#2563eb; --accent-dim:rgba(37,99,235,0.15);
+    --danger:#ef4444; --success:#22c55e; --warn:#f59e0b;
+    --text:#e2e8f0; --text-dim:#64748b;
+    --mono:'JetBrains Mono',monospace; --sans:'Inter',system-ui,sans-serif;
     --sidebar-w:280px;
+  }
+
+  html[data-theme="light"] {
+    --bg:#f8fafc; --bg2:#ffffff; --bg3:#f1f5f9; --panel:#ffffff;
+    --border:#e2e8f0; --accent-dim:rgba(37,99,235,0.1);
+    --danger:#dc2626; --success:#16a34a; --warn:#d97706;
+    --text:#0f172a; --text-dim:#94a3b8;
   }
 
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -22,7 +29,7 @@
   /* HEADER */
   header { display:flex; align-items:center; justify-content:space-between; padding:0 14px; height:50px; background:var(--panel); border-bottom:1px solid var(--border); flex-shrink:0; z-index:200; gap:10px; }
   .header-left, .header-right { display:flex; align-items:center; gap:8px; }
-  .logo { font-family:var(--display); font-size:14px; color:var(--accent); letter-spacing:0.15em; white-space:nowrap; text-shadow:0 0 10px rgba(0,212,255,0.5); }
+  .logo { font-family:var(--sans); font-weight:700; font-size:14px; color:var(--accent); letter-spacing:0.04em; white-space:nowrap; }
   .logo-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent); margin-right:7px; animation:blink 2s infinite; }
   @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
@@ -122,7 +129,7 @@
 
   #camera-grid { display:grid; width:100%; height:100%; gap:2px; padding:2px; grid-auto-rows:1fr; }
   .cam-card { position:relative; width:100%; height:100%; background:#000; overflow:hidden; transition:box-shadow .25s ease-out; }
-  .cam-card:hover { box-shadow:inset 0 0 0 1px rgba(0,212,255,0.5), 0 0 20px rgba(0,212,255,0.08); z-index:1; }
+  .cam-card:hover { box-shadow:inset 0 0 0 2px var(--accent); z-index:1; }
   .cam-card::after { content:''; position:absolute; inset:0; background:repeating-linear-gradient(to bottom,transparent 0px,transparent 3px,rgba(0,0,0,0.06) 3px,rgba(0,0,0,0.06) 4px); pointer-events:none; z-index:3; }
   .cam-card iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:none; }
 
@@ -230,7 +237,7 @@
   body.fs-mode header.header-revealed {
     transform: translateY(0);
     transition: transform .22s cubic-bezier(0,0,.2,1);
-    box-shadow: 0 4px 32px rgba(0,0,0,.96), 0 1px 0 rgba(0,212,255,.25) inset;
+    box-shadow: 0 4px 32px rgba(0,0,0,.96);
   }
   #hot-zone {
     display: none;
@@ -275,11 +282,13 @@
 <header>
   <div class="header-left">
     <button class="btn-icon" onclick="toggleSidebar()" aria-label="Alternar barra lateral" type="button">☰</button>
-    <div class="logo"><span class="logo-dot"></span>GO2RTC MONITOR</div>
+    <div class="logo"><span class="logo-dot"></span>BIT2CAM</div>
   </div>
   <div class="header-right">
     <button class="btn-icon success" onclick="applySelection()" type="button">▶ APLICAR</button>
+    <a href="setup.html" class="btn-icon" title="Acesso técnico — requer senha" type="button">⚙ SETUP</a>
     <button class="btn-icon" id="btn-sobre" onclick="openAbout()" title="Sobre o BIT2CAM" aria-label="Sobre" type="button">ℹ SOBRE<span class="update-dot"></span></button>
+    <button class="btn-icon" id="btn-theme" onclick="toggleTheme()" title="Alternar tema claro/escuro" aria-label="Alternar tema" type="button">☀</button>
     <button class="btn-icon" id="btn-fullscreen" onclick="togglePageFullscreen()" title="Tela cheia" aria-label="Tela cheia" type="button">⛶</button>
     <div id="api-indicator" data-state="local" title="Modo local — Config API não encontrada">
       <span class="api-dot"></span><span id="api-indicator-label">LOCAL</span>
@@ -358,7 +367,7 @@
     </div>
     <div class="modal-body">
       <div style="text-align:center;padding:6px 0 18px;">
-        <div style="font-family:var(--display);font-size:22px;color:var(--accent);letter-spacing:0.15em;text-shadow:0 0 14px rgba(0,212,255,0.45);">BIT2CAM</div>
+        <div style="font-family:var(--sans);font-weight:700;font-size:22px;color:var(--accent);letter-spacing:0.04em;">BIT2CAM</div>
         <div style="font-family:var(--mono);font-size:12px;color:var(--text-dim);margin-top:5px;letter-spacing:0.06em;">MONITOR DE CÂMERAS IP · GO2RTC</div>
       </div>
 
@@ -406,7 +415,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const SRV_COLORS = ['#00d4ff','#00ff88','#ffcc00','#ff6b6b','#b48eff','#ff9f43','#54a0ff','#ff6b9d'];
+const SRV_COLORS = ['#2563eb','#22c55e','#f59e0b','#ef4444','#a78bfa','#f97316','#38bdf8','#f43f5e'];
 const HD_SUFFIX  = '_hd'; // convenção de sufixo para stream HD
 
 let config = {
@@ -978,7 +987,26 @@ async function doRename(cam, newName) {
   toast(`Renomeado para "${newName}"`, 'ok');
 }
 
+// ── TEMA ─────────────────────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('bit2cam_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = saved ? saved === 'dark' : prefersDark;
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  const btn = document.getElementById('btn-theme');
+  if (btn) btn.textContent = dark ? '☀' : '🌙';
+}
+
+function toggleTheme() {
+  const dark = document.documentElement.dataset.theme !== 'dark';
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  localStorage.setItem('bit2cam_theme', dark ? 'dark' : 'light');
+  const btn = document.getElementById('btn-theme');
+  if (btn) btn.textContent = dark ? '☀' : '🌙';
+}
+
 // ── INIT ─────────────────────────────────────────────────────────
+initTheme();
 document.getElementById('version-tag').textContent = `BIT2CAM · ${APP_VERSION}`;
 load();
 checkForUpdates();

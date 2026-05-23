@@ -27,9 +27,10 @@ GITHUB_REPO="https://raw.githubusercontent.com/drbitgestor-code/Bit2Cam/main"
 # Exemplo: TAILSCALE_AUTHKEY=tskey-auth-xxxx sudo bash install.sh
 TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"
 
-# Senha do setup.html — padrão "bit2cam", pode ser sobrescrita
+# Senha do setup.html — pode ser passada como variável de ambiente
 # Exemplo: SETUP_PASSWORD=minhasenha sudo bash install.sh
-SETUP_PASSWORD="${SETUP_PASSWORD:-bit2cam}"
+# Se não passada, o instalador pergunta interativamente
+SETUP_PASSWORD="${SETUP_PASSWORD:-}"
 
 # ── BANNER ───────────────────────────────────────────────────────
 echo -e "${CYAN}"
@@ -73,6 +74,32 @@ success "Conectividade OK"
 # Informar sobre instalação existente
 if [[ -f "$INSTALL_DIR/go2rtc" ]]; then
   warn "Instalação existente detectada em $INSTALL_DIR — será atualizada"
+fi
+
+# ── SENHA DO SETUP ───────────────────────────────────────────────
+section "Senha do Setup"
+
+if [[ -n "$SETUP_PASSWORD" ]]; then
+  info "Usando senha passada por variável de ambiente"
+else
+  echo -e "  ${CYAN}Defina a senha para o acesso técnico (setup.html).${NC}"
+  echo -e "  Deixe em branco para usar o padrão: ${BOLD}bit2cam${NC}"
+  echo ""
+  while true; do
+    read -rsp "  Senha [bit2cam]: " _pwd1; echo
+    if [[ -z "$_pwd1" ]]; then
+      SETUP_PASSWORD="bit2cam"
+      info "Usando senha padrão: bit2cam"
+      break
+    fi
+    read -rsp "  Confirmar senha: " _pwd2; echo
+    if [[ "$_pwd1" == "$_pwd2" ]]; then
+      SETUP_PASSWORD="$_pwd1"
+      success "Senha configurada"
+      break
+    fi
+    warn "Senhas não coincidem — tente novamente"
+  done
 fi
 
 # ── DEPENDÊNCIAS ─────────────────────────────────────────────────
@@ -482,13 +509,15 @@ echo -e "${GREEN}${BOLD}║         Instalação concluída com sucesso!        
 echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}Acesso local (LAN):${NC}"
-echo -e "    http://${LOCAL_IP}:${GO2RTC_PORT}/bit2cam.html"
+echo -e "    Monitor:     http://${LOCAL_IP}:${GO2RTC_PORT}/bit2cam.html"
+echo -e "    Configuração: http://${LOCAL_IP}:${GO2RTC_PORT}/setup.html"
 echo -e "    go2rtc API:  http://${LOCAL_IP}:${GO2RTC_PORT}/api/streams"
 echo -e "    Config API:  http://${LOCAL_IP}:${CONFIG_API_PORT}/config"
 echo ""
 if [[ -n "$TAILSCALE_IP" ]]; then
   echo -e "  ${BOLD}Acesso remoto (Tailscale):${NC}"
-  echo -e "    http://${TAILSCALE_IP}:${GO2RTC_PORT}/bit2cam.html"
+  echo -e "    Monitor:     http://${TAILSCALE_IP}:${GO2RTC_PORT}/bit2cam.html"
+  echo -e "    Configuração: http://${TAILSCALE_IP}:${GO2RTC_PORT}/setup.html"
   echo -e "    go2rtc API:  http://${TAILSCALE_IP}:${GO2RTC_PORT}/api/streams"
   echo -e "    Config API:  http://${TAILSCALE_IP}:${CONFIG_API_PORT}/config"
   echo ""

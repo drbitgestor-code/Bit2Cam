@@ -5,15 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bit2Cam · Setup</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Exo+2:wght@300;400;600;700&family=Orbitron:wght@600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
   :root {
-    --bg:#080c10; --bg2:#0d1117; --bg3:#111820; --panel:#0a1520;
-    --border:#1a2f45; --accent:#00d4ff; --accent-dim:rgba(0,212,255,0.12);
-    --danger:#ff3b3b; --success:#00ff88; --warn:#ffcc00;
-    --text:#c8dce8; --text-dim:#4a6a80;
-    --mono:'JetBrains Mono',monospace; --sans:'Exo 2',sans-serif;
-    --display:'Orbitron','JetBrains Mono',monospace;
+    --bg:#111827; --bg2:#1a2035; --bg3:#1f2d45; --panel:#151e2d;
+    --border:#2d3a52; --accent:#2563eb; --accent-dim:rgba(37,99,235,0.15);
+    --danger:#ef4444; --success:#22c55e; --warn:#f59e0b;
+    --text:#e2e8f0; --text-dim:#64748b;
+    --mono:'JetBrains Mono',monospace; --sans:'Inter',system-ui,sans-serif;
+  }
+
+  html[data-theme="light"] {
+    --bg:#f8fafc; --bg2:#ffffff; --bg3:#f1f5f9; --panel:#ffffff;
+    --border:#e2e8f0; --accent-dim:rgba(37,99,235,0.1);
+    --danger:#dc2626; --success:#16a34a; --warn:#d97706;
+    --text:#0f172a; --text-dim:#94a3b8;
   }
 
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -29,7 +35,7 @@
     padding:40px 48px; display:flex; flex-direction:column; align-items:center; gap:20px;
     width:100%; max-width:360px;
   }
-  .lock-logo { font-family:var(--display); font-size:16px; color:var(--accent); letter-spacing:.15em; text-shadow:0 0 12px rgba(0,212,255,.5); }
+  .lock-logo { font-family:var(--sans); font-weight:700; font-size:16px; color:var(--accent); letter-spacing:.04em; }
   .lock-sub  { font-family:var(--mono); font-size:11px; color:var(--text-dim); letter-spacing:.1em; }
   .lock-input {
     width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:3px;
@@ -51,7 +57,7 @@
     padding:0 24px; height:52px; background:var(--panel);
     border-bottom:1px solid var(--border); flex-shrink:0; gap:16px;
   }
-  .logo { font-family:var(--display); font-size:14px; color:var(--accent); letter-spacing:0.15em; text-shadow:0 0 10px rgba(0,212,255,0.5); display:flex; align-items:center; gap:8px; white-space:nowrap; }
+  .logo { font-family:var(--sans); font-weight:700; font-size:14px; color:var(--accent); letter-spacing:0.04em; display:flex; align-items:center; gap:8px; white-space:nowrap; }
   .logo-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent); animation:blink 2s infinite; }
   @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
@@ -218,7 +224,7 @@
 
 <header>
   <div class="logo"><span class="logo-dot"></span>BIT2CAM · SETUP</div>
-  <div class="steps">
+  <div class="steps" style="flex:1;justify-content:center;">
     <div class="step-wrap">
       <div class="step-dot active" id="sdot-1">1<span class="step-label">CONECTAR</span></div>
     </div>
@@ -234,6 +240,9 @@
     <div class="step-wrap">
       <div class="step-dot" id="sdot-4">4<span class="step-label">FINALIZAR</span></div>
     </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <button class="btn" id="btn-theme" onclick="toggleTheme()" title="Alternar tema" style="padding:5px 11px;font-size:13px;">☀</button>
   </div>
 </header>
 
@@ -298,6 +307,9 @@
           <button class="btn" onclick="addManual()">+ Adicionar</button>
         </div>
       </div>
+      <p style="font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-top:10px; line-height:1.9;">
+        Portas ONVIF comuns: <b>80</b> (padrão/Dahua), <b>8000</b> (Hikvision), <b>2020</b>, <b>8080</b>
+      </p>
     </div>
 
     <div class="btn-row">
@@ -334,7 +346,7 @@
     </div>
     <div class="btn-row hidden" id="finish-actions">
       <button class="btn" onclick="goStep(2)">+ Adicionar mais câmeras</button>
-      <a id="btn-monitor" href="bit2cam.html" class="btn success-btn">Abrir Monitor →</a>
+      <a id="btn-monitor" href="bit2cam.html" class="btn success-btn">← Abrir Monitor</a>
     </div>
   </div>
 
@@ -473,12 +485,23 @@ async function startScan() {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    const data = await res.json();
+    const raw = await res.json();
     waveEl.classList.add('hidden');
 
-    if (!Array.isArray(data) || data.length === 0) {
+    // go2rtc pode retornar array [{url,name,...}] ou objeto {nome: [urls]}
+    let data = [];
+    if (Array.isArray(raw)) {
+      data = raw;
+    } else if (raw && typeof raw === 'object') {
+      data = Object.entries(raw).map(([name, val]) => ({
+        url: Array.isArray(val) ? (val.find(u => String(u).startsWith('onvif://')) || val[0]) : String(val),
+        name,
+      }));
+    }
+
+    if (data.length === 0) {
       statusEl.textContent = 'Nenhuma câmera ONVIF encontrada. Adicione manualmente abaixo.';
-      listEl.innerHTML = `<div class="empty">Nenhuma câmera respondeu ao multicast ONVIF.<br>Verifique se go2rtc está na mesma subrede das câmeras<br>ou adicione câmeras pelo IP abaixo.</div>`;
+      listEl.innerHTML = `<div class="empty">Nenhuma câmera respondeu ao multicast ONVIF.<br><br>Possível causa: VM com rede NAT bloqueia multicast UDP.<br>Use modo bridge ou adicione câmeras pelo IP abaixo.</div>`;
       return;
     }
 
@@ -662,9 +685,14 @@ async function testCam(uid) {
     renderProfiles(uid, profiles);
 
   } catch (e) {
+    let errMsg = e.message;
+    if (errMsg.includes('404')) errMsg = 'endpoint não suportado — atualize go2rtc';
+    else if (errMsg.includes('401') || errMsg.includes('403')) errMsg = 'credenciais rejeitadas';
+    else if (errMsg.includes('timeout') || errMsg.includes('AbortError') || e.name === 'AbortError') errMsg = 'timeout — porta ONVIF incorreta?';
     camTest[uid]      = 'err';
-    badge.textContent = `✕ ${e.message}`;
+    badge.textContent = `✕ ${errMsg}`;
     badge.className   = 'badge err';
+    badge.title       = `Testado: onvif://...@${cam.ip}:${cam.port}`;
     document.getElementById(`profiles-wrap-${uid}`)?.classList.add('hidden');
   }
 }
@@ -864,7 +892,26 @@ async function unlock() {
   }
 }
 
+// ── TEMA ─────────────────────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('bit2cam_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const dark = saved ? saved === 'dark' : prefersDark;
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  const btn = document.getElementById('btn-theme');
+  if (btn) btn.textContent = dark ? '☀' : '🌙';
+}
+
+function toggleTheme() {
+  const dark = document.documentElement.dataset.theme !== 'dark';
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  localStorage.setItem('bit2cam_theme', dark ? 'dark' : 'light');
+  const btn = document.getElementById('btn-theme');
+  if (btn) btn.textContent = dark ? '☀' : '🌙';
+}
+
 // ── INIT ─────────────────────────────────────────────────────────
+initTheme();
 document.getElementById('lock-pwd').focus();
 </script>
 </body>

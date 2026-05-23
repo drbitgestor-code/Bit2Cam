@@ -40,18 +40,20 @@ section "O que deseja fazer?"
 echo -e "  ${BOLD}[1]${NC} Alterar senha do setup"
 echo -e "  ${BOLD}[2]${NC} Atualizar HTMLs + reiniciar serviços"
 echo -e "  ${BOLD}[3]${NC} Os dois"
+echo -e "  ${BOLD}[4]${NC} ${RED}Desinstalar${NC} (remove go2rtc e todos os serviços)"
 echo ""
-read -rp "  Opção [1/2/3]: " OPCAO
+read -rp "  Opção [1/2/3/4]: " OPCAO
 
 case "$OPCAO" in
   1|3) DO_PASSWORD=true  ;;
   2)   DO_PASSWORD=false ;;
+  4)   DO_PASSWORD=false ;;
   *)   error "Opção inválida: $OPCAO" ;;
 esac
 
 case "$OPCAO" in
   2|3) DO_UPDATE=true  ;;
-  1)   DO_UPDATE=false ;;
+  1|4) DO_UPDATE=false ;;
 esac
 
 # ── ALTERAR SENHA ────────────────────────────────────────────────
@@ -124,7 +126,49 @@ do_update_html() {
   fi
 }
 
+# ── DESINSTALAR ──────────────────────────────────────────────────
+do_uninstall() {
+  section "Desinstalação"
+
+  warn "Esta operação irá remover o BIT2CAM, go2rtc e todos os serviços associados."
+  warn "Os dados de câmeras em $INSTALL_DIR/config.json serão APAGADOS."
+  echo ""
+  read -rp "  Confirma a desinstalação? [s/N]: " confirm
+  [[ "${confirm,,}" != "s" ]] && { info "Desinstalação cancelada."; exit 0; }
+
+  info "Parando e desativando serviços..."
+  systemctl stop go2rtc go2rtc-config-api 2>/dev/null || true
+  systemctl disable go2rtc go2rtc-config-api 2>/dev/null || true
+  success "Serviços parados"
+
+  info "Removendo arquivos de serviço..."
+  rm -f /etc/systemd/system/go2rtc.service
+  rm -f /etc/systemd/system/go2rtc-config-api.service
+  systemctl daemon-reload
+  success "Arquivos de serviço removidos"
+
+  info "Removendo diretório de instalação..."
+  rm -rf "$INSTALL_DIR"
+  success "Diretório $INSTALL_DIR removido"
+
+  if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+    info "Removendo regras do firewall..."
+    ufw delete allow 1984/tcp > /dev/null 2>&1 || true
+    ufw delete allow 8554/tcp > /dev/null 2>&1 || true
+    ufw delete allow 1985/tcp > /dev/null 2>&1 || true
+    success "Regras ufw removidas"
+  fi
+
+  echo ""
+  echo -e "${GREEN}${BOLD}✔ BIT2CAM desinstalado com sucesso.${NC}"
+  echo -e "  ${YELLOW}go2rtc e go2rtc-config-api foram removidos.${NC}"
+  echo -e "  Tailscale foi mantido — remova manualmente se necessário."
+  echo ""
+}
+
 # ── EXECUÇÃO ─────────────────────────────────────────────────────
+[[ "$OPCAO" == "4" ]] && do_uninstall && exit 0
+
 $DO_UPDATE    && do_update_html
 # Se os dois: a senha é alterada depois do update (sobrepõe qualquer hash do arquivo baixado)
 $DO_PASSWORD  && do_change_password
