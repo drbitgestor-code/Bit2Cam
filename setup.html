@@ -715,7 +715,10 @@ async function testCam(uid) {
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    const profiles = await res.json();
+    let profiles = await res.json();
+    console.log('[bit2cam] /api/onvif?src raw:', JSON.stringify(profiles));
+    // go2rtc pode retornar {sources:[...]} em vez de array direto
+    if (!Array.isArray(profiles) && Array.isArray(profiles?.sources)) profiles = profiles.sources;
     if (!Array.isArray(profiles) || profiles.length === 0) throw new Error('Nenhum perfil retornado');
 
     camProfiles[uid]       = profiles;
