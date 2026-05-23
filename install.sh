@@ -27,6 +27,10 @@ GITHUB_REPO="https://raw.githubusercontent.com/drbitgestor-code/Bit2Cam/main"
 # Exemplo: TAILSCALE_AUTHKEY=tskey-auth-xxxx sudo bash install.sh
 TAILSCALE_AUTHKEY="${TAILSCALE_AUTHKEY:-}"
 
+# Senha do setup.html — padrão "bit2cam", pode ser sobrescrita
+# Exemplo: SETUP_PASSWORD=minhasenha sudo bash install.sh
+SETUP_PASSWORD="${SETUP_PASSWORD:-bit2cam}"
+
 # ── BANNER ───────────────────────────────────────────────────────
 echo -e "${CYAN}"
 cat << 'BANNER'
@@ -291,6 +295,13 @@ _copy_html() {
 
 _copy_html "cameras-v23.html"
 _copy_html "setup.html"
+
+# Injetar hash da senha no setup.html
+if [[ -f "$WWW_DIR/setup.html" ]]; then
+  SETUP_HASH=$(echo -n "$SETUP_PASSWORD" | sha256sum | awk '{print $1}')
+  sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$SETUP_HASH'/" "$WWW_DIR/setup.html"
+  success "Senha do setup configurada"
+fi
 
 HTML_DEST="$WWW_DIR/cameras-v23.html"
 

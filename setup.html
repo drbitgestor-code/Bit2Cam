@@ -19,6 +19,32 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; display:flex; flex-direction:column; }
 
+  /* LOCK SCREEN */
+  #lock-screen {
+    position:fixed; inset:0; background:var(--bg); z-index:9999;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .lock-box {
+    background:var(--bg2); border:1px solid var(--border); border-radius:8px;
+    padding:40px 48px; display:flex; flex-direction:column; align-items:center; gap:20px;
+    width:100%; max-width:360px;
+  }
+  .lock-logo { font-family:var(--display); font-size:16px; color:var(--accent); letter-spacing:.15em; text-shadow:0 0 12px rgba(0,212,255,.5); }
+  .lock-sub  { font-family:var(--mono); font-size:11px; color:var(--text-dim); letter-spacing:.1em; }
+  .lock-input {
+    width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:3px;
+    padding:10px 14px; color:var(--text); font-family:var(--mono); font-size:14px;
+    outline:none; text-align:center; letter-spacing:.1em; transition:border-color .2s;
+  }
+  .lock-input:focus { border-color:var(--accent); }
+  .lock-btn {
+    width:100%; background:var(--accent); border:none; border-radius:3px;
+    padding:10px; color:var(--bg); font-family:var(--mono); font-size:13px;
+    font-weight:600; cursor:pointer; letter-spacing:.05em; transition:.2s;
+  }
+  .lock-btn:hover { background:rgba(0,212,255,.8); }
+  .lock-err { font-family:var(--mono); font-size:12px; color:var(--danger); min-height:16px; }
+
   /* HEADER */
   header {
     display:flex; align-items:center; justify-content:space-between;
@@ -210,6 +236,19 @@
     </div>
   </div>
 </header>
+
+<!-- LOCK SCREEN -->
+<div id="lock-screen">
+  <div class="lock-box">
+    <div class="lock-logo">BIT2CAM</div>
+    <div class="lock-sub">ACESSO TÉCNICO</div>
+    <input class="lock-input" type="password" id="lock-pwd" placeholder="senha"
+      autocomplete="current-password"
+      onkeydown="if(event.key==='Enter')unlock()">
+    <button class="lock-btn" onclick="unlock()">ENTRAR</button>
+    <div class="lock-err" id="lock-err"></div>
+  </div>
+</div>
 
 <div class="wizard-body">
 
@@ -776,8 +815,31 @@ function updateLastLog(container, cls, msg) {
   last.innerHTML = `<span class="li">${icons[cls] || '·'}</span><span>${esc(msg)}</span>`;
 }
 
+// ── LOCK SCREEN ──────────────────────────────────────────────────
+// Hash SHA-256 da senha de acesso técnico.
+// Padrão: "bit2cam" — altere via install.sh (variável SETUP_PASSWORD).
+const SETUP_HASH = '3b0d5ff7b4be8e579c964eaa4aa41c41400817409c534a77baa0506c31ce8809';
+
+async function unlock() {
+  const pwd = document.getElementById('lock-pwd').value;
+  const err = document.getElementById('lock-err');
+  if (!pwd) { err.textContent = 'Digite a senha'; return; }
+
+  const buf  = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
+  const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+
+  if (hash === SETUP_HASH) {
+    document.getElementById('lock-screen').style.display = 'none';
+    checkConnection();
+  } else {
+    err.textContent = 'Senha incorreta';
+    document.getElementById('lock-pwd').value = '';
+    document.getElementById('lock-pwd').focus();
+  }
+}
+
 // ── INIT ─────────────────────────────────────────────────────────
-checkConnection();
+document.getElementById('lock-pwd').focus();
 </script>
 </body>
 </html>
