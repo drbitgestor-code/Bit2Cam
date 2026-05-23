@@ -713,10 +713,11 @@ async function testCam(uid) {
       `${go2rtcBase()}/api/onvif?src=${encodeURIComponent(onvifSrc)}`,
       { signal: AbortSignal.timeout(10000) }
     );
+    const body = await res.text();
+    console.log('[bit2cam] testCam status:', res.status, 'body:', body);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    let profiles = await res.json();
-    console.log('[bit2cam] /api/onvif?src raw:', JSON.stringify(profiles));
+    let profiles = JSON.parse(body);
     // go2rtc pode retornar {sources:[...]} em vez de array direto
     if (!Array.isArray(profiles) && Array.isArray(profiles?.sources)) profiles = profiles.sources;
     if (!Array.isArray(profiles) || profiles.length === 0) throw new Error('Nenhum perfil retornado');
