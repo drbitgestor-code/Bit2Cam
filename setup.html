@@ -714,7 +714,6 @@ async function testCam(uid) {
       { signal: AbortSignal.timeout(10000) }
     );
     const body = await res.text();
-    console.log('[bit2cam] testCam status:', res.status, 'body:', body);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     let profiles = JSON.parse(body);
