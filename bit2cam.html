@@ -795,7 +795,8 @@ const LS_UPDATE_AVAIL = 'bit2cam_update_avail';
 
 function openAbout() {
   document.getElementById('about-version').textContent = APP_VERSION;
-  document.getElementById('about-build').textContent   = new Date(APP_VERSION).toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
+  const [y,m,d] = APP_VERSION.split('-').map(Number);
+  document.getElementById('about-build').textContent = new Date(y,m-1,d).toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'});
 
   const lastCheck = parseInt(localStorage.getItem(LS_LAST_CHECK)||'0');
   document.getElementById('about-last-check').textContent = lastCheck
