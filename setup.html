@@ -486,6 +486,7 @@ async function startScan() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const raw = await res.json();
+    console.log('[bit2cam] /api/onvif raw:', JSON.stringify(raw));
     waveEl.classList.add('hidden');
 
     // Extrai URL onvif:// de qualquer valor que go2rtc possa retornar
