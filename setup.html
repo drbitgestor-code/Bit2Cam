@@ -652,7 +652,7 @@ function renderCredsForms() {
 
   cams.forEach(cam => {
     if (!camCfg[cam.uid]) {
-      camCfg[cam.uid] = { displayName: cam.name, user: 'admin', pass: '', profile: null };
+      camCfg[cam.uid] = { displayName: cam.name, user: 'admin', pass: '', profileNormal: null, profileHd: null };
     }
     const cfg = camCfg[cam.uid];
     const uid = cam.uid;
@@ -683,8 +683,14 @@ function renderCredsForms() {
         </div>
       </div>
       <div id="profiles-wrap-${esc(uid)}" class="hidden">
-        <label class="field-label">PERFIL / STREAM</label>
-        <div class="profile-list" id="profiles-${esc(uid)}"></div>
+        <div style="margin-bottom:10px;">
+          <label class="field-label">STREAM NORMAL — grade</label>
+          <div class="profile-list" id="profiles-normal-${esc(uid)}"></div>
+        </div>
+        <div>
+          <label class="field-label">STREAM HD — fullscreen <span style="opacity:.55;font-size:.85em;font-weight:400">(opcional)</span></label>
+          <div class="profile-list" id="profiles-hd-${esc(uid)}"></div>
+        </div>
       </div>
     `;
     listEl.appendChild(div);
@@ -721,11 +727,12 @@ async function testCam(uid) {
     if (!Array.isArray(profiles) && Array.isArray(profiles?.sources)) profiles = profiles.sources;
     if (!Array.isArray(profiles) || profiles.length === 0) throw new Error('Nenhum perfil retornado');
 
-    camProfiles[uid]       = profiles;
-    camCfg[uid].profile    = profiles[0];
-    camTest[uid]           = 'ok';
-    badge.textContent      = `✓ ${profiles.length} perfil(is)`;
-    badge.className        = 'badge ok';
+    camProfiles[uid]             = profiles;
+    camCfg[uid].profileNormal    = profiles[0];
+    camCfg[uid].profileHd        = null;
+    camTest[uid]                 = 'ok';
+    badge.textContent            = `✓ ${profiles.length} perfil(is)`;
+    badge.className              = 'badge ok';
 
     renderProfiles(uid, profiles);
 
@@ -743,22 +750,40 @@ async function testCam(uid) {
 }
 
 function renderProfiles(uid, profiles) {
-  const wrap = document.getElementById(`profiles-wrap-${uid}`);
-  const list = document.getElementById(`profiles-${uid}`);
-  if (!wrap || !list) return;
+  const wrap       = document.getElementById(`profiles-wrap-${uid}`);
+  const listNormal = document.getElementById(`profiles-normal-${uid}`);
+  const listHd     = document.getElementById(`profiles-hd-${uid}`);
+  if (!wrap || !listNormal || !listHd) return;
 
-  list.innerHTML = '';
+  // Stream normal: primeiro perfil pré-selecionado
+  listNormal.innerHTML = '';
   profiles.forEach((p, i) => {
     const chip = document.createElement('div');
     chip.className = `profile-chip${i === 0 ? ' active' : ''}`;
     chip.textContent = p.name || `Perfil ${i + 1}`;
     chip.title = p.url || '';
     chip.addEventListener('click', () => {
-      list.querySelectorAll('.profile-chip').forEach(c => c.classList.remove('active'));
+      listNormal.querySelectorAll('.profile-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      camCfg[uid].profile = p;
+      camCfg[uid].profileNormal = p;
     });
-    list.appendChild(chip);
+    listNormal.appendChild(chip);
+  });
+
+  // Stream HD: "Nenhum" pré-selecionado (null), depois os perfis
+  listHd.innerHTML = '';
+  const hdItems = [{ _none: true, name: 'Nenhum', url: '' }, ...profiles];
+  hdItems.forEach((p, i) => {
+    const chip = document.createElement('div');
+    chip.className = `profile-chip${i === 0 ? ' active' : ''}`;
+    chip.textContent = p.name || `Perfil ${i}`;
+    chip.title = p.url || '';
+    chip.addEventListener('click', () => {
+      listHd.querySelectorAll('.profile-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      camCfg[uid].profileHd = p._none ? null : p;
+    });
+    listHd.appendChild(chip);
   });
 
   wrap.classList.remove('hidden');
@@ -775,7 +800,7 @@ async function runFinish() {
   actionsEl.classList.add('hidden');
 
   const cams  = discoveredCams.filter(c => selectedUids.has(c.uid));
-  const total = cams.length * 2 + 2; // go2rtc + config por cam + ler config + salvar
+  const total = cams.length * 3 + 2; // normal + HD (opcional) + config por cam + ler + salvar
   let   done  = 0;
 
   const setProgress = () => { fillEl.style.width = `${Math.round((++done / total) * 100)}%`; };
@@ -810,12 +835,13 @@ async function runFinish() {
     const pass        = cfg.pass        || '';
     const streamName  = toStreamName(displayName);
 
-    // Fonte: usa URL do perfil se testado, senão onvif:// direto
-    const streamSrc = (cfg.profile?.url && cfg.profile.url.startsWith('rtsp'))
-      ? cfg.profile.url
-      : `onvif://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${cam.ip}:${cam.port}`;
+    // Fonte: usa URL do perfil normal se testado, senão onvif:// direto
+    const onvifFallback = `onvif://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${cam.ip}:${cam.port}`;
+    const streamSrc = (cfg.profileNormal?.url && cfg.profileNormal.url.startsWith('rtsp'))
+      ? cfg.profileNormal.url
+      : onvifFallback;
 
-    // ── 3a. PUT /api/streams no go2rtc ──
+    // ── 3a. PUT stream normal no go2rtc ──
     addLog(logEl, 'running', `Registrando "${displayName}" no go2rtc…`);
     try {
       const r = await fetch(
@@ -830,16 +856,34 @@ async function runFinish() {
     }
     setProgress();
 
-    // ── 3b. Registrar na config do monitor ──
+    // ── 3b. PUT stream HD (opcional) ──
+    const hdStreamName = cfg.profileHd ? streamName + '_hd' : null;
+    if (cfg.profileHd?.url) {
+      const hdSrc = cfg.profileHd.url.startsWith('rtsp') ? cfg.profileHd.url : onvifFallback;
+      addLog(logEl, 'running', `Registrando "${displayName} HD" no go2rtc…`);
+      try {
+        const r = await fetch(
+          `${go2rtcBase()}/api/streams?name=${encodeURIComponent(hdStreamName)}&src=${encodeURIComponent(hdSrc)}`,
+          { method: 'PUT', signal: AbortSignal.timeout(8000) }
+        );
+        if (!r.ok && r.status !== 409) throw new Error(`HTTP ${r.status}`);
+        updateLastLog(logEl, 'ok', `✔ "${displayName} HD" → go2rtc (id: ${hdStreamName})`);
+      } catch (e) {
+        updateLastLog(logEl, 'err', `✕ "${displayName} HD" → go2rtc: ${e.message}`);
+      }
+      setProgress();
+    }
+
+    // ── 3c. Registrar na config do monitor ──
     addLog(logEl, 'running', `Adicionando "${displayName}" ao monitor…`);
     const exists = appConfig.cameras.find(c => c.id === streamName && c.srvId === srv.id);
     if (!exists) {
-      const camEntry = { uid: mkUid(), id: streamName, hdId: null, name: displayName, src: streamSrc, srvId: srv.id };
+      const camEntry = { uid: mkUid(), id: streamName, hdId: hdStreamName, name: displayName, src: streamSrc, srvId: srv.id };
       appConfig.cameras.push(camEntry);
       if (!appConfig.selectedUids.includes(camEntry.uid)) {
         appConfig.selectedUids.push(camEntry.uid);
       }
-      updateLastLog(logEl, 'ok', `✔ "${displayName}" adicionada ao monitor`);
+      updateLastLog(logEl, 'ok', `✔ "${displayName}" adicionada ao monitor${hdStreamName ? ' + HD' : ''}`);
     } else {
       updateLastLog(logEl, 'info', `○ "${displayName}" já existia no monitor`);
     }
