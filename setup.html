@@ -105,6 +105,9 @@
   .cam-detail { font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cam-check  { font-size:16px; flex-shrink:0; transition:.2s; }
   .cam-card.selected .cam-check { color:var(--accent); }
+  .cam-card.already-added { opacity:.55; cursor:default; }
+  .cam-card.already-added .cam-name { text-decoration:line-through; }
+  .cam-already-badge { font-size:11px; color:var(--success); font-family:var(--mono); white-space:nowrap; }
 
   /* CREDENTIAL CARD */
   .cred-card { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:16px; }
@@ -360,8 +363,24 @@ const GO2RTC_PORT     = 1984;
 const CONFIG_API_PORT = 1985;
 
 // ── ESTADO ────────────────────────────────────────────────────────
-let discoveredCams = [];  // [{uid, ip, port, name, model, rawUrl}]
-let selectedUids   = new Set();
+let discoveredCams    = [];  // [{uid, ip, port, name, model, rawUrl}]
+let selectedUids      = new Set();
+let alreadyAddedIps   = new Set(); // "ip:port" de câmeras já no config
+
+async function loadAlreadyAdded() {
+  try {
+    const r = await fetch(`${configApiBase()}/config`, { signal: AbortSignal.timeout(3000) });
+    if (!r.ok) return;
+    const cfg = await r.json();
+    if (!Array.isArray(cfg?.cameras)) return;
+    alreadyAddedIps.clear();
+    cfg.cameras.forEach(cam => {
+      if (!cam.src) return;
+      const m = String(cam.src).match(/@([^/]+)/);
+      if (m) alreadyAddedIps.add(m[1]); // "ip:port"
+    });
+  } catch(_) {}
+}
 let camCfg         = {};  // uid → {displayName, user, pass, profile}
 let camTest        = {};  // uid → 'ok'|'err'|'testing'|null
 let camProfiles    = {};  // uid → [{name, url, ...}]
@@ -477,6 +496,7 @@ async function startScan() {
   statusEl.textContent = 'Enviando WS-Discovery multicast na rede…';
   waveEl.classList.remove('hidden');
   listEl.innerHTML = '';
+  loadAlreadyAdded(); // paralelo ao scan — popula alreadyAddedIps
   document.getElementById('btn-s2-next').disabled = true;
 
   try {
@@ -594,9 +614,11 @@ function renderCamList() {
   if (discoveredCams.length === 0) return;
 
   discoveredCams.forEach(cam => {
-    const sel = selectedUids.has(cam.uid);
-    const div = document.createElement('div');
-    div.className  = `cam-card${sel ? ' selected' : ''}`;
+    const ipPort  = cam.port && cam.port !== '80' ? `${cam.ip}:${cam.port}` : cam.ip;
+    const added   = alreadyAddedIps.has(ipPort) || alreadyAddedIps.has(`${cam.ip}:${cam.port}`);
+    const sel     = !added && selectedUids.has(cam.uid);
+    const div     = document.createElement('div');
+    div.className = `cam-card${sel ? ' selected' : ''}${added ? ' already-added' : ''}`;
     div.dataset.uid = cam.uid;
 
     const detail = [
@@ -610,9 +632,11 @@ function renderCamList() {
         <div class="cam-name">${esc(cam.name)}</div>
         <div class="cam-detail">${esc(detail)}</div>
       </div>
-      <div class="cam-check">${sel ? '✓' : '○'}</div>
+      ${added
+        ? `<span class="cam-already-badge">✓ configurada</span>`
+        : `<div class="cam-check">${sel ? '✓' : '○'}</div>`}
     `;
-    div.addEventListener('click', () => toggleCam(cam.uid));
+    if (!added) div.addEventListener('click', () => toggleCam(cam.uid));
     listEl.appendChild(div);
   });
 

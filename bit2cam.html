@@ -285,7 +285,6 @@
     <div class="logo"><span class="logo-dot"></span>BIT2CAM</div>
   </div>
   <div class="header-right">
-    <button class="btn-icon success" onclick="applySelection()" type="button">▶ APLICAR</button>
     <a href="setup.html" class="btn-icon" title="Acesso técnico — requer senha" type="button">⚙ SETUP</a>
     <button class="btn-icon" id="btn-sobre" onclick="openAbout()" title="Sobre o BIT2CAM" aria-label="Sobre" type="button">ℹ SOBRE<span class="update-dot"></span></button>
     <button class="btn-icon" id="btn-theme" onclick="toggleTheme()" title="Alternar tema claro/escuro" aria-label="Alternar tema" type="button">☀</button>
@@ -774,9 +773,10 @@ function toggleCam(camUid,e) {
   updateListItem(camUid);updateSelCount();
   if (currentTab==='sel') renderDragList();
   save();
+  applySelection();
 }
 
-function selectAll() { config.selectedUids=config.cameras.map(c=>c.uid);renderAllList();renderDragList();updateSelCount();save(); }
+function selectAll() { config.selectedUids=config.cameras.map(c=>c.uid);renderAllList();renderDragList();updateSelCount();save();applySelection(); }
 function clearAll()  { config.selectedUids=[];renderAllList();renderDragList();updateSelCount();save();applySelection(); }
 
 // ── APPLY ────────────────────────────────────────────────────────
