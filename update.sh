@@ -79,10 +79,20 @@ do_change_password() {
 _download_html() {
   local file="$1"
   local dest="$WWW_DIR/$file"
+  local bust
+  bust=$(date +%s)
 
   info "Baixando $file do GitHub..."
-  if curl -fsSL --max-time 30 "$GITHUB_REPO/$file" -o "$dest"; then
-    success "$file atualizado do GitHub"
+  # ?t= evita cache do CDN do GitHub raw
+  if curl -fsSL --max-time 30 "${GITHUB_REPO}/${file}?t=${bust}" -o "$dest"; then
+    # Exibe APP_VERSION se presente no arquivo baixado
+    local ver
+    ver=$(grep -oP "APP_VERSION\s*=\s*'\K[^']+" "$dest" 2>/dev/null || true)
+    if [[ -n "$ver" ]]; then
+      success "$file atualizado (versão: $ver)"
+    else
+      success "$file atualizado do GitHub"
+    fi
   else
     # fallback: cópia local se GitHub falhar
     local src="$SCRIPT_DIR/$file"
