@@ -993,7 +993,7 @@ function generateStandalone() {
   const out =html.replace('const STANDALONE_DATA = null;',data);
   const blob=new Blob([out],{type:'text/html'});
   const link=document.createElement('a');
-  link.href=URL.createObjectURL(blob);link.download='monitor_go2rtc_v22.html';link.click();
+  link.href=URL.createObjectURL(blob);link.download='monitor_go2rtc_v23.html';link.click();
   toast('Arquivo do cliente gerado!');
 }
 
