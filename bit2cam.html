@@ -131,7 +131,7 @@
   .cam-card { position:relative; width:100%; height:100%; background:#000; overflow:hidden; transition:box-shadow .25s ease-out; }
   .cam-card:hover { box-shadow:inset 0 0 0 2px var(--accent); z-index:1; }
   .cam-card::after { content:''; position:absolute; inset:0; background:repeating-linear-gradient(to bottom,transparent 0px,transparent 3px,rgba(0,0,0,0.06) 3px,rgba(0,0,0,0.06) 4px); pointer-events:none; z-index:3; }
-  .cam-card iframe { position:absolute; top:0; left:0; width:100%; height:100%; border:none; }
+  .cam-card video { position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; }
 
   .cam-label { position:absolute; top:6px; left:6px; background:rgba(0,0,0,0.75); padding:2px 7px 2px 5px; font-family:var(--mono); font-size:13px; z-index:10; border-radius:3px; pointer-events:none; display:flex; align-items:center; gap:5px; }
   .cam-label-dot  { width:6px; height:6px; min-width:6px; border-radius:50%; flex-shrink:0; }
@@ -155,7 +155,7 @@
   .fs-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--border); flex-shrink:0; }
   .fs-title { font-family:var(--mono); font-size:15px; color:var(--accent); display:flex; align-items:center; gap:8px; }
   .fs-body { flex:1; position:relative; }
-  .fs-body iframe { position:absolute; inset:0; width:100%; height:100%; border:none; }
+  .fs-body video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; }
   .fs-overlay-block { position:absolute; inset:0; z-index:10; }
   .fs-footer { padding:8px 16px; background:var(--panel); border-top:1px solid var(--border); font-family:var(--mono); font-size:13px; color:var(--text-dim); display:flex; align-items:center; gap:12px; flex-shrink:0; }
   .fs-quality { display:flex; align-items:center; gap:5px; }
@@ -345,7 +345,7 @@
     <button class="btn-icon" onclick="closeFullscreen()" type="button" aria-label="Fechar fullscreen">✕ FECHAR [ESC]</button>
   </div>
   <div class="fs-body">
-    <iframe id="fs-iframe" src=""></iframe>
+    <video id="fs-video" autoplay muted playsinline></video>
     <div class="fs-overlay-block"></div>
   </div>
   <div class="fs-footer">
@@ -530,10 +530,59 @@ function uid()       { return Date.now().toString(36) + Math.random().toString(3
 function srvColor(srvId) { const i = config.servers.findIndex(s=>s.id===srvId); return SRV_COLORS[i%SRV_COLORS.length]||'#fff'; }
 function srvName(srvId)  { const s = config.servers.find(s=>s.id===srvId); return s?s.name:'?'; }
 function srvUrl(srvId)   { const s = config.servers.find(s=>s.id===srvId); return s?s.url:''; }
-function streamUrl(srvId, streamId) {
-  const base = srvUrl(srvId);
-  if (!/^https?:\/\//i.test(base)) return 'about:blank';
-  return `${base}/stream.html?src=${encodeURIComponent(streamId)}&mode=webrtc,mse,hls,mjpeg`;
+// ── WEBRTC PLAYER ────────────────────────────────────────────────
+const _pcs = {};
+
+async function startWebRTC(videoEl, base, streamId, key) {
+  stopWebRTC(key);
+  if (!/^https?:\/\//i.test(base)) return;
+
+  const pc = new RTCPeerConnection({ iceServers: [] });
+  _pcs[key] = pc;
+
+  pc.ontrack = ev => {
+    if (ev.streams?.[0] && videoEl.srcObject !== ev.streams[0])
+      videoEl.srcObject = ev.streams[0];
+  };
+
+  pc.addTransceiver('video', { direction: 'recvonly' });
+  pc.addTransceiver('audio', { direction: 'recvonly' });
+
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const res = await fetch(
+      `${base}/api/webrtc?src=${encodeURIComponent(streamId)}`,
+      { method: 'POST', body: offer.sdp, headers: { 'Content-Type': 'application/sdp' }, signal: AbortSignal.timeout(10000) }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const answer = await res.text();
+    if (_pcs[key] !== pc) return;
+    await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+  } catch(_) {
+    if (_pcs[key] === pc) {
+      pc.close();
+      delete _pcs[key];
+      setTimeout(() => { if (videoEl.isConnected) startWebRTC(videoEl, base, streamId, key); }, 5000);
+    }
+    return;
+  }
+
+  pc.onconnectionstatechange = () => {
+    if ((pc.connectionState === 'failed' || pc.connectionState === 'disconnected') && _pcs[key] === pc) {
+      pc.close();
+      delete _pcs[key];
+      setTimeout(() => { if (videoEl.isConnected) startWebRTC(videoEl, base, streamId, key); }, 5000);
+    }
+  };
+}
+
+function stopWebRTC(key) {
+  if (_pcs[key]) { _pcs[key].close(); delete _pcs[key]; }
+}
+
+function stopAllGridPcs() {
+  Object.keys(_pcs).filter(k => k.startsWith('grid-')).forEach(stopWebRTC);
 }
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -736,7 +785,7 @@ function applySelection() {
   const empty = document.getElementById('empty-state');
   const count = config.selectedUids.length;
 
-  grid.querySelectorAll('iframe').forEach(f=>f.src='');
+  stopAllGridPcs();
   empty.style.display=count===0?'flex':'none';
   grid.innerHTML='';
   if (!count) return;
@@ -760,13 +809,14 @@ function applySelection() {
         <span class="cam-label-srv">${esc(srvName(cam.srvId))}</span>
         ${cam.hdId?`<span class="cam-label-hd">HD</span>`:''}
       </div>
-      <iframe src="${streamUrl(cam.srvId,cam.id)}" loading="lazy"></iframe>
+      <video id="gridv-${esc(cam.uid)}" autoplay muted playsinline></video>
       <div class="cam-overlay" onclick="openFullscreen('${cam.uid}')" title="${cam.hdId?'Clique para fullscreen em HD':'Clique para fullscreen'}"></div>
       <div class="cam-btn-wrap">
         <button class="cam-btn remove" onclick="event.stopPropagation();toggleCam('${camUid}');applySelection();" title="Remover">✕</button>
       </div>
     `;
     grid.appendChild(card);
+    startWebRTC(card.querySelector('video'), srvUrl(cam.srvId), cam.id, `grid-${cam.uid}`);
   });
 }
 
@@ -784,13 +834,16 @@ function openFullscreen(camUid) {
   document.getElementById('fs-badge').innerHTML         = isHD ? `<span style="font-size:12px;padding:2px 5px;background:rgba(0,212,255,0.15);color:var(--accent);border:1px solid rgba(0,212,255,0.3);border-radius:2px;margin-left:4px;">ALTA RESOLUÇÃO</span>` : '';
   document.getElementById('fs-quality-label').textContent = isHD ? 'STREAM HD · ALTA RESOLUÇÃO' : 'STREAM PADRÃO';
   document.getElementById('fs-srv').textContent         = srvName(cam.srvId);
-  document.getElementById('fs-iframe').src              = streamUrl(cam.srvId, streamId);
+  const fsVideo = document.getElementById('fs-video');
+  fsVideo.srcObject = null;
   document.getElementById('fs-overlay').classList.add('open');
+  startWebRTC(fsVideo, srvUrl(cam.srvId), streamId, 'fs');
 }
 
 function closeFullscreen() {
+  stopWebRTC('fs');
+  document.getElementById('fs-video').srcObject = null;
   document.getElementById('fs-overlay').classList.remove('open');
-  document.getElementById('fs-iframe').src='';
 }
 
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') { closeFullscreen(); closeAbout(); } });
