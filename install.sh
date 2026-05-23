@@ -267,24 +267,32 @@ success "config-api.py criado"
 # ── MONITOR HTML ─────────────────────────────────────────────────
 section "Monitor HTML"
 
-HTML_SRC="$SCRIPT_DIR/cameras-v23.html"
-HTML_DEST="$WWW_DIR/cameras-v23.html"
+_copy_html() {
+  local file="$1"
+  local src="$SCRIPT_DIR/$file"
+  local dest="$WWW_DIR/$file"
 
-if [[ -f "$HTML_SRC" ]]; then
-  cp "$HTML_SRC" "$HTML_DEST"
-  success "cameras-v23.html copiado da pasta local"
-elif [[ -n "$GITHUB_REPO" && "$GITHUB_REPO" != *"SEU_USUARIO"* ]]; then
-  info "Arquivo local não encontrado — baixando do GitHub..."
-  if curl -fsSL "$GITHUB_REPO/cameras-v23.html" -o "$HTML_DEST" 2>/dev/null; then
-    success "cameras-v23.html baixado do GitHub"
+  if [[ -f "$src" ]]; then
+    cp "$src" "$dest"
+    success "$file copiado da pasta local"
+  elif [[ -n "$GITHUB_REPO" && "$GITHUB_REPO" != *"SEU_USUARIO"* ]]; then
+    info "$file não encontrado localmente — baixando do GitHub..."
+    if curl -fsSL "$GITHUB_REPO/$file" -o "$dest" 2>/dev/null; then
+      success "$file baixado do GitHub"
+    else
+      warn "Falha ao baixar $file do GitHub"
+      warn "Copie manualmente para: $dest"
+    fi
   else
-    warn "Falha ao baixar do GitHub"
-    warn "Copie manualmente para: $HTML_DEST"
+    warn "$file não encontrado e GITHUB_REPO não configurado"
+    warn "Copie manualmente para: $dest"
   fi
-else
-  warn "cameras-v23.html não encontrado e GITHUB_REPO não configurado"
-  warn "Copie manualmente para: $HTML_DEST"
-fi
+}
+
+_copy_html "cameras-v23.html"
+_copy_html "setup.html"
+
+HTML_DEST="$WWW_DIR/cameras-v23.html"
 
 # Placeholder caso o HTML não tenha chegado
 if [[ ! -f "$HTML_DEST" ]]; then

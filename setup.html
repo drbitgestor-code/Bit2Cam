@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bit2Cam · Setup</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Exo+2:wght@300;400;600;700&family=Orbitron:wght@600;700&display=swap');
+
+  :root {
+    --bg:#080c10; --bg2:#0d1117; --bg3:#111820; --panel:#0a1520;
+    --border:#1a2f45; --accent:#00d4ff; --accent-dim:rgba(0,212,255,0.12);
+    --danger:#ff3b3b; --success:#00ff88; --warn:#ffcc00;
+    --text:#c8dce8; --text-dim:#4a6a80;
+    --mono:'JetBrains Mono',monospace; --sans:'Exo 2',sans-serif;
+    --display:'Orbitron','JetBrains Mono',monospace;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; display:flex; flex-direction:column; }
+
+  /* HEADER */
+  header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 24px; height:52px; background:var(--panel);
+    border-bottom:1px solid var(--border); flex-shrink:0; gap:16px;
+  }
+  .logo { font-family:var(--display); font-size:14px; color:var(--accent); letter-spacing:0.15em; text-shadow:0 0 10px rgba(0,212,255,0.5); display:flex; align-items:center; gap:8px; white-space:nowrap; }
+  .logo-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent); animation:blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  /* STEPS */
+  .steps { display:flex; align-items:center; }
+  .step-wrap { display:flex; align-items:center; }
+  .step-dot {
+    width:28px; height:28px; border-radius:50%;
+    border:2px solid var(--border); background:var(--bg3);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:11px; color:var(--text-dim);
+    transition:.3s ease; flex-shrink:0; position:relative;
+  }
+  .step-dot.active { border-color:var(--accent); color:var(--accent); box-shadow:0 0 10px rgba(0,212,255,0.3); }
+  .step-dot.done   { border-color:var(--success); background:rgba(0,255,136,0.1); color:var(--success); }
+  .step-line { width:36px; height:1px; background:var(--border); transition:.3s ease; }
+  .step-line.done { background:var(--success); }
+  .step-label {
+    font-family:var(--mono); font-size:9px; color:var(--text-dim);
+    position:absolute; top:32px; left:50%; transform:translateX(-50%);
+    white-space:nowrap; pointer-events:none;
+  }
+  .step-dot.active .step-label { color:var(--accent); }
+  .step-dot.done   .step-label { color:var(--success); }
+
+  /* BODY */
+  .wizard-body { flex:1; display:flex; align-items:flex-start; justify-content:center; padding:32px 16px 48px; }
+  .panel { width:100%; max-width:660px; display:flex; flex-direction:column; gap:16px; }
+
+  /* CARD */
+  .card { background:var(--bg2); border:1px solid var(--border); border-radius:6px; padding:20px; }
+  .card-title { font-family:var(--mono); font-size:12px; color:var(--accent); margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:10px; letter-spacing:.05em; }
+
+  /* CAMERA CARDS */
+  .cam-card {
+    background:var(--bg3); border:1px solid var(--border); border-radius:4px;
+    padding:12px 14px; display:flex; align-items:center; gap:12px;
+    cursor:pointer; transition:.2s ease; user-select:none;
+  }
+  .cam-card:hover { border-color:rgba(0,212,255,0.3); }
+  .cam-card.selected { border-color:var(--accent); background:var(--accent-dim); }
+  .cam-icon { font-size:20px; flex-shrink:0; line-height:1; }
+  .cam-info { flex:1; min-width:0; }
+  .cam-name   { font-family:var(--mono); font-size:13px; color:var(--text); }
+  .cam-detail { font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cam-check  { font-size:16px; flex-shrink:0; transition:.2s; }
+  .cam-card.selected .cam-check { color:var(--accent); }
+
+  /* CREDENTIAL CARD */
+  .cred-card { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:16px; }
+  .cred-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .cred-ip { font-family:var(--mono); font-size:12px; color:var(--accent); }
+
+  /* INPUTS */
+  .input-ui {
+    background:var(--bg); border:1px solid var(--border); border-radius:3px;
+    padding:7px 10px; color:var(--text); font-family:var(--mono); font-size:13px;
+    outline:none; transition:border-color .2s; width:100%;
+  }
+  .input-ui:focus { border-color:var(--accent); }
+  .input-ui::placeholder { color:var(--text-dim); }
+  .field-label { font-family:var(--mono); font-size:10px; color:var(--text-dim); display:block; margin-bottom:4px; letter-spacing:.05em; }
+  .field-row { display:flex; gap:10px; align-items:flex-end; }
+  .f1 { flex:1; }
+  .f2 { flex:2; }
+
+  /* BUTTONS */
+  .btn {
+    background:var(--bg3); border:1px solid var(--border); color:var(--accent);
+    padding:7px 16px; cursor:pointer; border-radius:3px;
+    font-family:var(--mono); font-size:12px; transition:.2s ease;
+    white-space:nowrap; touch-action:manipulation; text-decoration:none; display:inline-block;
+  }
+  .btn:hover { background:var(--accent-dim); border-color:var(--accent); }
+  .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .btn:disabled { opacity:.35; cursor:default; pointer-events:none; }
+  .btn.primary { color:var(--bg); background:var(--accent); border-color:var(--accent); font-weight:600; }
+  .btn.primary:hover { background:rgba(0,212,255,0.8); }
+  .btn.success-btn { color:var(--success); border-color:rgba(0,255,136,0.3); }
+  .btn.success-btn:hover { background:rgba(0,255,136,0.08); border-color:var(--success); }
+  .btn-row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .btn-row.end { justify-content:flex-end; }
+
+  /* STATUS BADGE */
+  .badge {
+    font-family:var(--mono); font-size:10px; padding:2px 8px;
+    border-radius:2px; transition:.3s;
+  }
+  .badge.ok      { color:var(--success); background:rgba(0,255,136,0.08); border:1px solid rgba(0,255,136,0.25); }
+  .badge.err     { color:var(--danger);  background:rgba(255,59,59,0.08);  border:1px solid rgba(255,59,59,0.25); }
+  .badge.testing { color:var(--warn);    background:rgba(255,204,0,0.08);   border:1px solid rgba(255,204,0,0.25); animation:blink 1s infinite; }
+  .badge.idle    { color:var(--text-dim); border:1px solid var(--border); }
+
+  /* STATUS ROW */
+  .status-row { display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:13px; }
+  .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .dot.green  { background:var(--success); box-shadow:0 0 6px var(--success); }
+  .dot.red    { background:var(--danger);  box-shadow:0 0 6px var(--danger);  }
+  .dot.yellow { background:var(--warn);    box-shadow:0 0 6px var(--warn); animation:blink 1s infinite; }
+
+  /* SCAN WAVE */
+  .scan-wave { display:flex; gap:3px; align-items:center; }
+  .scan-wave span { width:3px; border-radius:2px; background:var(--accent); animation:wave 1.2s infinite ease-in-out; }
+  .scan-wave span:nth-child(1){height:6px;  animation-delay:0s;}
+  .scan-wave span:nth-child(2){height:12px; animation-delay:.1s;}
+  .scan-wave span:nth-child(3){height:18px; animation-delay:.2s;}
+  .scan-wave span:nth-child(4){height:12px; animation-delay:.3s;}
+  .scan-wave span:nth-child(5){height:6px;  animation-delay:.4s;}
+  @keyframes wave { 0%,100%{transform:scaleY(0.4);opacity:.4;} 50%{transform:scaleY(1);opacity:1;} }
+
+  /* PROFILES */
+  .profile-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .profile-chip {
+    font-family:var(--mono); font-size:11px; padding:3px 10px;
+    border-radius:2px; border:1px solid var(--border); background:var(--bg);
+    color:var(--text-dim); cursor:pointer; transition:.2s;
+  }
+  .profile-chip:hover { border-color:var(--accent); color:var(--accent); }
+  .profile-chip.active { border-color:var(--accent); background:var(--accent-dim); color:var(--accent); }
+
+  /* PROGRESS */
+  .progress-bar { height:3px; background:var(--border); border-radius:2px; overflow:hidden; margin-bottom:16px; }
+  .progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .4s ease; box-shadow:0 0 8px rgba(0,212,255,0.5); }
+
+  /* LOG */
+  .log { display:flex; flex-direction:column; gap:5px; font-family:var(--mono); font-size:12px; line-height:1.6; }
+  .log-line { display:flex; align-items:flex-start; gap:8px; }
+  .log-line .li { flex-shrink:0; }
+  .log-line.ok      .li { color:var(--success); }
+  .log-line.err     .li { color:var(--danger);  }
+  .log-line.running .li { color:var(--warn); animation:blink 1s infinite; }
+  .log-line.info    .li { color:var(--text-dim); }
+
+  /* HELPERS */
+  .empty { text-align:center; padding:28px 16px; color:var(--text-dim); font-family:var(--mono); font-size:12px; line-height:2; }
+  .sep { height:1px; background:var(--border); margin:8px 0; }
+  .hidden { display:none !important; }
+  code { background:rgba(0,0,0,0.4); padding:1px 6px; border-radius:2px; font-family:var(--mono); font-size:12px; }
+
+  /* TOAST */
+  .toast {
+    position:fixed; bottom:24px; left:50%;
+    transform:translateX(-50%) translateY(16px);
+    background:var(--bg2); border:1px solid var(--border); border-radius:4px;
+    padding:8px 18px; font-family:var(--mono); font-size:13px; color:var(--text);
+    opacity:0; transition:.3s ease; pointer-events:none; z-index:999; white-space:nowrap;
+  }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* INFO BOX */
+  .info-box { font-family:var(--mono); font-size:12px; line-height:1.9; padding:12px 14px; border-radius:4px; }
+  .info-box.success-box { color:var(--success); background:rgba(0,255,136,0.04); border:1px solid rgba(0,255,136,0.15); }
+  .info-box.error-box   { color:var(--danger);  background:rgba(255,59,59,0.04);  border:1px solid rgba(255,59,59,0.15);  }
+  .info-box.dim-box     { color:var(--text-dim); border:1px solid var(--border); }
+
+  @media (max-width:580px) {
+    header { padding:0 14px; }
+    .step-line { width:20px; }
+    .step-label { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span class="logo-dot"></span>BIT2CAM · SETUP</div>
+  <div class="steps">
+    <div class="step-wrap">
+      <div class="step-dot active" id="sdot-1">1<span class="step-label">CONECTAR</span></div>
+    </div>
+    <div class="step-line" id="sline-1"></div>
+    <div class="step-wrap">
+      <div class="step-dot" id="sdot-2">2<span class="step-label">DESCOBRIR</span></div>
+    </div>
+    <div class="step-line" id="sline-2"></div>
+    <div class="step-wrap">
+      <div class="step-dot" id="sdot-3">3<span class="step-label">CREDENCIAIS</span></div>
+    </div>
+    <div class="step-line" id="sline-3"></div>
+    <div class="step-wrap">
+      <div class="step-dot" id="sdot-4">4<span class="step-label">FINALIZAR</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="wizard-body">
+
+  <!-- ═══ STEP 1: VERIFICAR CONEXÃO ═══ -->
+  <div class="panel" id="panel-1">
+    <div class="card">
+      <div class="card-title">■ VERIFICAÇÃO DO SISTEMA</div>
+      <div id="s1-status" class="status-row">
+        <span class="dot yellow"></span>
+        <span>Conectando ao go2rtc…</span>
+      </div>
+      <div id="s1-info" class="hidden info-box success-box" style="margin-top:14px;"></div>
+      <div id="s1-error" class="hidden info-box error-box" style="margin-top:14px;"></div>
+    </div>
+    <div class="btn-row end">
+      <button class="btn primary" id="btn-s1-next" disabled onclick="goStep(2)">Escanear câmeras →</button>
+    </div>
+  </div>
+
+  <!-- ═══ STEP 2: SCAN ONVIF ═══ -->
+  <div class="panel hidden" id="panel-2">
+    <div class="card">
+      <div class="card-title">
+        ■ SCAN DE REDE ONVIF
+        <div class="scan-wave hidden" id="scan-wave">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div id="s2-status" style="font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:12px;"></div>
+      <div id="cam-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">■ ADICIONAR MANUALMENTE</div>
+      <div class="field-row">
+        <div class="f2">
+          <label class="field-label">IP / HOST</label>
+          <input class="input-ui" id="m-ip" placeholder="192.168.1.100"
+            onkeydown="if(event.key==='Enter')addManual()">
+        </div>
+        <div style="flex:0 0 80px;">
+          <label class="field-label">PORTA ONVIF</label>
+          <input class="input-ui" id="m-port" placeholder="80"
+            onkeydown="if(event.key==='Enter')addManual()">
+        </div>
+        <div style="align-self:flex-end;">
+          <button class="btn" onclick="addManual()">+ Adicionar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn" onclick="goStep(1)">← Voltar</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn" onclick="startScan()">↺ Novo scan</button>
+        <button class="btn primary" id="btn-s2-next" disabled onclick="goStep(3)">Configurar credenciais →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STEP 3: CREDENCIAIS ═══ -->
+  <div class="panel hidden" id="panel-3">
+    <div class="card">
+      <div class="card-title">■ CREDENCIAIS DAS CÂMERAS</div>
+      <p style="font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:16px; line-height:1.7;">
+        Defina o nome de exibição e as credenciais de cada câmera.<br>
+        Clique em <b style="color:var(--accent)">Testar</b> para verificar antes de prosseguir.
+      </p>
+      <div id="creds-list" style="display:flex; flex-direction:column; gap:14px;"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="goStep(2)">← Voltar</button>
+      <button class="btn primary" id="btn-s3-next" onclick="goStep(4)">Finalizar →</button>
+    </div>
+  </div>
+
+  <!-- ═══ STEP 4: FINALIZAR ═══ -->
+  <div class="panel hidden" id="panel-4">
+    <div class="card">
+      <div class="card-title">■ CONFIGURANDO SISTEMA</div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      <div id="finish-log" class="log"></div>
+    </div>
+    <div class="btn-row hidden" id="finish-actions">
+      <button class="btn" onclick="goStep(2)">+ Adicionar mais câmeras</button>
+      <a id="btn-monitor" href="cameras-v23.html" class="btn success-btn">Abrir Monitor →</a>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONSTANTES ────────────────────────────────────────────────────
+const GO2RTC_PORT     = 1984;
+const CONFIG_API_PORT = 1985;
+
+// ── ESTADO ────────────────────────────────────────────────────────
+let discoveredCams = [];  // [{uid, ip, port, name, model, rawUrl}]
+let selectedUids   = new Set();
+let camCfg         = {};  // uid → {displayName, user, pass, profile}
+let camTest        = {};  // uid → 'ok'|'err'|'testing'|null
+let camProfiles    = {};  // uid → [{name, url, ...}]
+
+// ── HELPERS ───────────────────────────────────────────────────────
+let _toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = String(s ?? '');
+  return d.innerHTML;
+}
+
+function mkUid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function toStreamName(s) {
+  return (s || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'cam_' + mkUid().slice(-4);
+}
+
+function go2rtcBase() {
+  const h = (window.location.protocol === 'file:') ? 'localhost' : window.location.hostname;
+  return `http://${h}:${GO2RTC_PORT}`;
+}
+
+function configApiBase() {
+  const h = (window.location.protocol === 'file:') ? 'localhost' : window.location.hostname;
+  return `http://${h}:${CONFIG_API_PORT}`;
+}
+
+// ── NAVEGAÇÃO ─────────────────────────────────────────────────────
+let currentStep = 1;
+
+function goStep(n) {
+  document.getElementById(`panel-${currentStep}`).classList.add('hidden');
+  document.getElementById(`panel-${n}`).classList.remove('hidden');
+
+  for (let i = 1; i <= 4; i++) {
+    const dot  = document.getElementById(`sdot-${i}`);
+    const line = document.getElementById(`sline-${i}`);
+    dot.classList.remove('active', 'done');
+    if (line) line.classList.remove('done');
+    if (i < n)  { dot.classList.add('done');   if (line) line.classList.add('done'); }
+    if (i === n) dot.classList.add('active');
+  }
+
+  currentStep = n;
+
+  if (n === 2 && discoveredCams.length === 0) startScan();
+  if (n === 3) renderCredsForms();
+  if (n === 4) runFinish();
+}
+
+// ── STEP 1: CONEXÃO ───────────────────────────────────────────────
+async function checkConnection() {
+  const statusEl = document.getElementById('s1-status');
+  const infoEl   = document.getElementById('s1-info');
+  const errEl    = document.getElementById('s1-error');
+  const btnNext  = document.getElementById('btn-s1-next');
+
+  try {
+    const res = await fetch(`${go2rtcBase()}/api/streams`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const streams = await res.json();
+    const count   = Object.keys(streams || {}).length;
+
+    statusEl.innerHTML = `<span class="dot green"></span><span>go2rtc conectado</span>`;
+    infoEl.innerHTML   = [
+      `<b>HOST</b>    ${esc(window.location.hostname || 'localhost')}`,
+      `<b>PORTA</b>   ${GO2RTC_PORT}`,
+      `<b>STREAMS</b> ${count} stream(s) já configurado(s)`,
+    ].join('<br>');
+    infoEl.classList.remove('hidden');
+    errEl.classList.add('hidden');
+    btnNext.disabled = false;
+
+  } catch (e) {
+    statusEl.innerHTML = `<span class="dot red"></span><span>Não foi possível conectar ao go2rtc</span>`;
+    errEl.innerHTML = [
+      `<b>Erro:</b> ${esc(e.message)}`,
+      ``,
+      `<b>Verifique:</b>`,
+      `• go2rtc está rodando na porta ${GO2RTC_PORT}`,
+      `• Execute o instalador caso necessário:`,
+      `  <code>sudo bash install.sh</code>`,
+    ].join('<br>');
+    errEl.classList.remove('hidden');
+    infoEl.classList.add('hidden');
+    btnNext.disabled = true;
+  }
+}
+
+// ── STEP 2: SCAN ONVIF ────────────────────────────────────────────
+async function startScan() {
+  const statusEl = document.getElementById('s2-status');
+  const listEl   = document.getElementById('cam-list');
+  const waveEl   = document.getElementById('scan-wave');
+
+  statusEl.textContent = 'Enviando WS-Discovery multicast na rede…';
+  waveEl.classList.remove('hidden');
+  listEl.innerHTML = '';
+  document.getElementById('btn-s2-next').disabled = true;
+
+  try {
+    const res  = await fetch(`${go2rtcBase()}/api/onvif`, {
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const data = await res.json();
+    waveEl.classList.add('hidden');
+
+    if (!Array.isArray(data) || data.length === 0) {
+      statusEl.textContent = 'Nenhuma câmera ONVIF encontrada. Adicione manualmente abaixo.';
+      listEl.innerHTML = `<div class="empty">Nenhuma câmera respondeu ao multicast ONVIF.<br>Verifique se go2rtc está na mesma subrede das câmeras<br>ou adicione câmeras pelo IP abaixo.</div>`;
+      return;
+    }
+
+    // Preserva câmeras manuais já adicionadas
+    const manuais = discoveredCams.filter(c => c.model === 'manual');
+    discoveredCams = [...manuais];
+
+    data.forEach(item => {
+      const parsed = parseOnvifUrl(item.url || '');
+      const uid    = mkUid();
+      discoveredCams.push({
+        uid,
+        ip:     parsed.host  || item.url || '?',
+        port:   parsed.port  || '80',
+        name:   item.name    || item.info || parsed.host || 'Câmera',
+        model:  item.info    || '',
+        rawUrl: item.url     || '',
+      });
+    });
+
+    statusEl.textContent = `${data.length} câmera(s) encontrada(s) na rede.`;
+    renderCamList();
+
+  } catch (e) {
+    waveEl.classList.add('hidden');
+    statusEl.textContent = `Falha no scan: ${e.message}`;
+    listEl.innerHTML = `<div class="empty">Erro ao executar ONVIF discovery.<br>Adicione câmeras manualmente pelo IP abaixo.</div>`;
+  }
+}
+
+function parseOnvifUrl(url) {
+  try {
+    const m = url.match(/^onvif:\/\/([^@]*)@([^/:?#]+)(?::(\d+))?/);
+    if (m) {
+      const [, creds, host, port] = m;
+      const [user = ''] = creds.split(':');
+      return { user, host, port: port || '80' };
+    }
+  } catch(_) {}
+  return {};
+}
+
+function renderCamList() {
+  const listEl  = document.getElementById('cam-list');
+  const btnNext = document.getElementById('btn-s2-next');
+  listEl.innerHTML = '';
+
+  if (discoveredCams.length === 0) return;
+
+  discoveredCams.forEach(cam => {
+    const sel = selectedUids.has(cam.uid);
+    const div = document.createElement('div');
+    div.className  = `cam-card${sel ? ' selected' : ''}`;
+    div.dataset.uid = cam.uid;
+
+    const detail = [
+      cam.ip + (cam.port !== '80' ? `:${cam.port}` : ''),
+      cam.model && cam.model !== 'manual' ? cam.model : null,
+    ].filter(Boolean).join(' · ');
+
+    div.innerHTML = `
+      <div class="cam-icon">📷</div>
+      <div class="cam-info">
+        <div class="cam-name">${esc(cam.name)}</div>
+        <div class="cam-detail">${esc(detail)}</div>
+      </div>
+      <div class="cam-check">${sel ? '✓' : '○'}</div>
+    `;
+    div.addEventListener('click', () => toggleCam(cam.uid));
+    listEl.appendChild(div);
+  });
+
+  btnNext.disabled = selectedUids.size === 0;
+}
+
+function toggleCam(uid) {
+  selectedUids.has(uid) ? selectedUids.delete(uid) : selectedUids.add(uid);
+  renderCamList();
+  document.getElementById('btn-s2-next').disabled = selectedUids.size === 0;
+}
+
+function addManual() {
+  const ipEl   = document.getElementById('m-ip');
+  const portEl = document.getElementById('m-port');
+  const ip     = ipEl.value.trim();
+  const port   = portEl.value.trim() || '80';
+
+  if (!ip) { toast('Informe o IP da câmera'); return; }
+  if (!/^[\w.\-]+$/.test(ip)) { toast('IP/hostname inválido'); return; }
+
+  const uid = mkUid();
+  discoveredCams.push({ uid, ip, port, name: `Câmera ${ip}`, model: 'manual', rawUrl: `onvif://:@${ip}:${port}` });
+  selectedUids.add(uid);
+  ipEl.value = portEl.value = '';
+  renderCamList();
+  toast(`${ip} adicionado`);
+}
+
+// ── STEP 3: CREDENCIAIS ───────────────────────────────────────────
+function renderCredsForms() {
+  const listEl = document.getElementById('creds-list');
+  listEl.innerHTML = '';
+
+  const cams = discoveredCams.filter(c => selectedUids.has(c.uid));
+  if (cams.length === 0) { goStep(2); return; }
+
+  cams.forEach(cam => {
+    if (!camCfg[cam.uid]) {
+      camCfg[cam.uid] = { displayName: cam.name, user: 'admin', pass: '', profile: null };
+    }
+    const cfg = camCfg[cam.uid];
+    const uid = cam.uid;
+
+    const div = document.createElement('div');
+    div.className = 'cred-card';
+    div.innerHTML = `
+      <div class="cred-header">
+        <span class="cred-ip">📷 ${esc(cam.ip)}${cam.port !== '80' ? ':' + esc(cam.port) : ''}</span>
+        <span class="badge idle" id="badge-${esc(uid)}">não testado</span>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label class="field-label">NOME DE EXIBIÇÃO</label>
+        <input class="input-ui" id="dname-${esc(uid)}" value="${esc(cfg.displayName)}" placeholder="Ex: Câmera Entrada">
+      </div>
+      <div class="field-row" style="margin-bottom:10px;">
+        <div class="f1">
+          <label class="field-label">USUÁRIO</label>
+          <input class="input-ui" id="user-${esc(uid)}" value="${esc(cfg.user)}" placeholder="admin" autocomplete="username">
+        </div>
+        <div class="f1">
+          <label class="field-label">SENHA</label>
+          <input class="input-ui" type="password" id="pass-${esc(uid)}" value="${esc(cfg.pass)}" placeholder="••••••••"
+            autocomplete="current-password" onkeydown="if(event.key==='Enter')testCam('${uid}')">
+        </div>
+        <div style="align-self:flex-end;">
+          <button class="btn" onclick="testCam('${uid}')">Testar</button>
+        </div>
+      </div>
+      <div id="profiles-wrap-${esc(uid)}" class="hidden">
+        <label class="field-label">PERFIL / STREAM</label>
+        <div class="profile-list" id="profiles-${esc(uid)}"></div>
+      </div>
+    `;
+    listEl.appendChild(div);
+  });
+}
+
+async function testCam(uid) {
+  const cam = discoveredCams.find(c => c.uid === uid);
+  if (!cam) return;
+
+  const displayName = document.getElementById(`dname-${uid}`)?.value.trim() || cam.name;
+  const user        = document.getElementById(`user-${uid}`)?.value.trim()  || '';
+  const pass        = document.getElementById(`pass-${uid}`)?.value.trim()  || '';
+  const badge       = document.getElementById(`badge-${uid}`);
+
+  camCfg[uid] = { ...camCfg[uid], displayName, user, pass };
+
+  badge.textContent = 'testando…';
+  badge.className   = 'badge testing';
+  camTest[uid]      = 'testing';
+
+  const onvifSrc = `onvif://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${cam.ip}:${cam.port}`;
+
+  try {
+    const res = await fetch(
+      `${go2rtcBase()}/api/onvif?src=${encodeURIComponent(onvifSrc)}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const profiles = await res.json();
+    if (!Array.isArray(profiles) || profiles.length === 0) throw new Error('Nenhum perfil retornado');
+
+    camProfiles[uid]       = profiles;
+    camCfg[uid].profile    = profiles[0];
+    camTest[uid]           = 'ok';
+    badge.textContent      = `✓ ${profiles.length} perfil(is)`;
+    badge.className        = 'badge ok';
+
+    renderProfiles(uid, profiles);
+
+  } catch (e) {
+    camTest[uid]      = 'err';
+    badge.textContent = `✕ ${e.message}`;
+    badge.className   = 'badge err';
+    document.getElementById(`profiles-wrap-${uid}`)?.classList.add('hidden');
+  }
+}
+
+function renderProfiles(uid, profiles) {
+  const wrap = document.getElementById(`profiles-wrap-${uid}`);
+  const list = document.getElementById(`profiles-${uid}`);
+  if (!wrap || !list) return;
+
+  list.innerHTML = '';
+  profiles.forEach((p, i) => {
+    const chip = document.createElement('div');
+    chip.className = `profile-chip${i === 0 ? ' active' : ''}`;
+    chip.textContent = p.name || `Perfil ${i + 1}`;
+    chip.title = p.url || '';
+    chip.addEventListener('click', () => {
+      list.querySelectorAll('.profile-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      camCfg[uid].profile = p;
+    });
+    list.appendChild(chip);
+  });
+
+  wrap.classList.remove('hidden');
+}
+
+// ── STEP 4: FINALIZAR ─────────────────────────────────────────────
+async function runFinish() {
+  const logEl     = document.getElementById('finish-log');
+  const fillEl    = document.getElementById('progress-fill');
+  const actionsEl = document.getElementById('finish-actions');
+
+  logEl.innerHTML = '';
+  fillEl.style.width = '0%';
+  actionsEl.classList.add('hidden');
+
+  const cams  = discoveredCams.filter(c => selectedUids.has(c.uid));
+  const total = cams.length * 2 + 2; // go2rtc + config por cam + ler config + salvar
+  let   done  = 0;
+
+  const setProgress = () => { fillEl.style.width = `${Math.round((++done / total) * 100)}%`; };
+
+  // ── 1. Ler config atual ──
+  addLog(logEl, 'running', 'Lendo configuração atual do monitor…');
+  let appConfig = { servers: [], cameras: [], selectedUids: [] };
+  try {
+    const r = await fetch(`${configApiBase()}/config`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      const d = await r.json();
+      if (d && Array.isArray(d.servers)) appConfig = d;
+    }
+  } catch(_) {}
+  updateLastLog(logEl, 'ok', '✔ Configuração carregada');
+  setProgress();
+
+  // ── 2. Garantir servidor local no config ──
+  const srvUrl = `${go2rtcBase()}`;
+  let   srv    = appConfig.servers.find(s => s.url === srvUrl);
+  if (!srv) {
+    srv = { id: mkUid(), name: 'Local', url: srvUrl };
+    appConfig.servers.push(srv);
+    addLog(logEl, 'ok', `✔ Servidor local registrado (${srvUrl})`);
+  }
+
+  // ── 3. Adicionar cada câmera ──
+  for (const cam of cams) {
+    const cfg         = camCfg[cam.uid] || {};
+    const displayName = cfg.displayName || cam.name;
+    const user        = cfg.user        || '';
+    const pass        = cfg.pass        || '';
+    const streamName  = toStreamName(displayName);
+
+    // Fonte: usa URL do perfil se testado, senão onvif:// direto
+    const streamSrc = (cfg.profile?.url && cfg.profile.url.startsWith('rtsp'))
+      ? cfg.profile.url
+      : `onvif://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${cam.ip}:${cam.port}`;
+
+    // ── 3a. PUT /api/streams no go2rtc ──
+    addLog(logEl, 'running', `Registrando "${displayName}" no go2rtc…`);
+    try {
+      const r = await fetch(
+        `${go2rtcBase()}/api/streams?name=${encodeURIComponent(streamName)}&src=${encodeURIComponent(streamSrc)}`,
+        { method: 'PUT', signal: AbortSignal.timeout(8000) }
+      );
+      // 409 = já existe, tudo bem
+      if (!r.ok && r.status !== 409) throw new Error(`HTTP ${r.status}`);
+      updateLastLog(logEl, 'ok', `✔ "${displayName}" → go2rtc (id: ${streamName})`);
+    } catch (e) {
+      updateLastLog(logEl, 'err', `✕ "${displayName}" → go2rtc: ${e.message}`);
+    }
+    setProgress();
+
+    // ── 3b. Registrar na config do monitor ──
+    addLog(logEl, 'running', `Adicionando "${displayName}" ao monitor…`);
+    const exists = appConfig.cameras.find(c => c.id === streamName && c.srvId === srv.id);
+    if (!exists) {
+      const camEntry = { uid: mkUid(), id: streamName, hdId: null, name: displayName, srvId: srv.id };
+      appConfig.cameras.push(camEntry);
+      if (!appConfig.selectedUids.includes(camEntry.uid)) {
+        appConfig.selectedUids.push(camEntry.uid);
+      }
+      updateLastLog(logEl, 'ok', `✔ "${displayName}" adicionada ao monitor`);
+    } else {
+      updateLastLog(logEl, 'info', `○ "${displayName}" já existia no monitor`);
+    }
+    setProgress();
+  }
+
+  // ── 4. Salvar config ──
+  addLog(logEl, 'running', 'Salvando configuração no servidor…');
+  try {
+    const r = await fetch(`${configApiBase()}/config`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(appConfig),
+      signal:  AbortSignal.timeout(5000),
+    });
+    if (r.ok) {
+      updateLastLog(logEl, 'ok', '✔ Configuração salva no servidor');
+    } else {
+      updateLastLog(logEl, 'err', `Aviso: config-api retornou HTTP ${r.status}`);
+    }
+  } catch(e) {
+    updateLastLog(logEl, 'err', `Aviso: config-api indisponível (${e.message}) — câmeras salvas no go2rtc`);
+  }
+  setProgress();
+
+  fillEl.style.width = '100%';
+  addLog(logEl, 'ok', '━━ Configuração concluída ━━');
+  actionsEl.classList.remove('hidden');
+}
+
+function addLog(container, cls, msg) {
+  const icons = { ok:'✔', err:'✕', running:'▸', info:'○' };
+  const line  = document.createElement('div');
+  line.className = `log-line ${cls}`;
+  line.innerHTML = `<span class="li">${icons[cls] || '·'}</span><span>${esc(msg)}</span>`;
+  container.appendChild(line);
+  line.scrollIntoView({ block: 'nearest' });
+}
+
+function updateLastLog(container, cls, msg) {
+  const lines = container.querySelectorAll('.log-line');
+  const last  = lines[lines.length - 1];
+  if (!last) return;
+  const icons = { ok:'✔', err:'✕', running:'▸', info:'○' };
+  last.className = `log-line ${cls}`;
+  last.innerHTML = `<span class="li">${icons[cls] || '·'}</span><span>${esc(msg)}</span>`;
+}
+
+// ── INIT ─────────────────────────────────────────────────────────
+checkConnection();
+</script>
+</body>
+</html>
