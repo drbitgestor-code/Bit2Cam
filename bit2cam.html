@@ -166,6 +166,10 @@
   /* MODAL CONFIG */
   .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.88); display:none; align-items:center; justify-content:center; z-index:1000; }
   .modal-overlay.show { display:flex; }
+  .modal-overlay.show:not(.closing) .modal { animation:modal-in .22s cubic-bezier(0,0,.2,1); }
+  .modal-overlay.closing .modal { animation:modal-out .18s cubic-bezier(.4,0,1,1) forwards; }
+  @keyframes modal-in  { from { opacity:0; transform:translateY(10px) scale(.97); } to { opacity:1; transform:none; } }
+  @keyframes modal-out { from { opacity:1; transform:none; } to { opacity:0; transform:translateY(6px) scale(.97); } }
   .modal { background:var(--panel); border:1px solid var(--border); width:95%; max-width:680px; max-height:90vh; border-radius:6px; display:flex; flex-direction:column; overflow:hidden; }
   .modal-header { padding:13px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
   .modal-header span { color:var(--accent); font-family:var(--mono); font-size:15px; letter-spacing:.08em; }
@@ -368,7 +372,6 @@
   <div class="modal" style="max-width:420px;">
     <div class="modal-header">
       <span><span class="material-icons" style="font-size:15px;vertical-align:middle;">info</span> SOBRE</span>
-      <button class="btn-icon" onclick="closeAbout()" type="button" aria-label="Fechar"><span class="material-icons">close</span></button>
     </div>
     <div class="modal-body">
       <div style="text-align:center;padding:6px 0 18px;">
@@ -410,7 +413,8 @@
         <code class="about-cmd">sudo bash update.sh</code>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn-icon" onclick="closeAbout()" type="button">FECHAR</button>
       <button class="btn-icon" id="btn-check-update" onclick="checkForUpdates(true)" type="button"><span class="material-icons">refresh</span> VERIFICAR AGORA</button>
     </div>
   </div>
@@ -879,7 +883,11 @@ function openAbout() {
 }
 
 function closeAbout() {
-  document.getElementById('modal-sobre').classList.remove('show');
+  const overlay = document.getElementById('modal-sobre');
+  overlay.classList.add('closing');
+  overlay.querySelector('.modal').addEventListener('animationend', () => {
+    overlay.classList.remove('show', 'closing');
+  }, { once: true });
 }
 
 function _renderUpdateStatus(hasUpdate) {
