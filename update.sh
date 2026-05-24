@@ -72,6 +72,7 @@ do_change_password() {
   local hash
   hash=$(echo -n "$pwd1" | sha256sum | awk '{print $1}')
   sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$hash'/" "$WWW_DIR/setup.html"
+  sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$hash'/" "$WWW_DIR/bit2cam.html"
   success "Senha do setup atualizada"
 }
 
@@ -128,7 +129,8 @@ do_update_html() {
   # Re-injetar a senha preservada
   if [[ -n "$current_hash" ]]; then
     sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$current_hash'/" "$WWW_DIR/setup.html"
-    success "Senha preservada no novo setup.html"
+    sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$current_hash'/" "$WWW_DIR/bit2cam.html"
+    success "Senha preservada nos HTMLs"
   fi
 
   section "Reiniciando serviços"

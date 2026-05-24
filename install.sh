@@ -323,10 +323,11 @@ _copy_html() {
 _copy_html "bit2cam.html"
 _copy_html "setup.html"
 
-# Injetar hash da senha no setup.html
+# Injetar hash da senha no setup.html e bit2cam.html
 if [[ -f "$WWW_DIR/setup.html" ]]; then
   SETUP_HASH=$(echo -n "$SETUP_PASSWORD" | sha256sum | awk '{print $1}')
   sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$SETUP_HASH'/" "$WWW_DIR/setup.html"
+  sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$SETUP_HASH'/" "$WWW_DIR/bit2cam.html"
   success "Senha do setup configurada"
 fi
 

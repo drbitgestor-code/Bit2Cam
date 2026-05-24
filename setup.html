@@ -1047,7 +1047,15 @@ document.addEventListener('pointerdown', function(e) {
 
 // ── INIT ─────────────────────────────────────────────────────────
 initTheme();
-document.getElementById('lock-pwd').focus();
+
+// Navegar do monitor já autenticado — pula o lock screen
+if (sessionStorage.getItem('bit2cam_setup_auth') === '1') {
+  sessionStorage.removeItem('bit2cam_setup_auth');
+  document.getElementById('lock-screen').style.display = 'none';
+  checkConnection();
+} else {
+  document.getElementById('lock-pwd').focus();
+}
 </script>
 </body>
 </html>
