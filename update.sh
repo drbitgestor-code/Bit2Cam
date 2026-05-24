@@ -93,6 +93,7 @@ _download_html() {
       warn "$file: conteúdo inválido ($lines linhas) — usando cópia local"
     else
       mv "$tmp" "$dest"
+      chmod 644 "$dest"
       local ver
       ver=$(grep -oP "APP_VERSION\s*=\s*'\K[^']+" "$dest" 2>/dev/null || true)
       success "$file atualizado do GitHub${ver:+ (versão: $ver)}"
