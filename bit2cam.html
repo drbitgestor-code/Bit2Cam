@@ -372,6 +372,7 @@
   <div class="modal" style="max-width:420px;">
     <div class="modal-header">
       <span><span class="material-icons" style="font-size:15px;vertical-align:middle;">info</span> SOBRE</span>
+      <button class="btn-icon" onclick="closeAbout()" type="button" aria-label="Fechar" style="padding:4px 8px;">✕</button>
     </div>
     <div class="modal-body">
       <div style="text-align:center;padding:6px 0 18px;">
@@ -860,9 +861,10 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') { closeFullscreen
 
 // ── SOBRE / VERIFICAÇÃO DE ATUALIZAÇÃO ───────────────────────────
 const GITHUB_API     = 'https://api.github.com/repos/drbitgestor-code/Bit2Cam/commits?path=bit2cam.html&per_page=1';
-const CHECK_INTERVAL  = 7 * 24 * 60 * 60 * 1000; // 7 dias
-const LS_LAST_CHECK   = 'bit2cam_last_check';
-const LS_LATEST_DATE  = 'bit2cam_latest_date'; // data do commit mais recente no GitHub
+const CHECK_INTERVAL    = 7 * 24 * 60 * 60 * 1000; // 7 dias
+const LS_LAST_CHECK     = 'bit2cam_last_check';
+const LS_LATEST_DATE    = 'bit2cam_latest_date';   // data do commit mais recente no GitHub
+const LS_INSTALLED_VER  = 'bit2cam_installed_ver'; // versão instalada (detecta update.sh)
 
 function _storedHasUpdate() {
   const d = localStorage.getItem(LS_LATEST_DATE) || '';
@@ -1094,6 +1096,15 @@ document.addEventListener('pointerdown', function(e) {
 // ── INIT ─────────────────────────────────────────────────────────
 initTheme();
 document.getElementById('version-tag').textContent = `BIT2CAM · ${APP_VERSION}`;
+
+// Se a versão instalada mudou (update.sh rodou), limpa cache de update e força re-check
+if (localStorage.getItem(LS_INSTALLED_VER) !== APP_VERSION) {
+  localStorage.setItem(LS_INSTALLED_VER, APP_VERSION);
+  localStorage.removeItem(LS_LATEST_DATE);
+  localStorage.removeItem(LS_LAST_CHECK);
+  localStorage.removeItem('bit2cam_update_avail'); // chave antiga
+}
+
 load();
 checkForUpdates();
 </script>
