@@ -6,6 +6,7 @@
 <title>Bit2Cam · Setup</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 
   :root {
     --bg:#111827; --bg2:#1a2035; --bg3:#1f2d45; --panel:#151e2d;
@@ -47,6 +48,7 @@
     width:100%; background:var(--accent); border:none; border-radius:3px;
     padding:10px; color:var(--bg); font-family:var(--mono); font-size:13px;
     font-weight:600; cursor:pointer; letter-spacing:.05em; transition:.2s;
+    overflow:hidden; position:relative;
   }
   .lock-btn:hover { background:rgba(0,212,255,.8); }
   .lock-err { font-family:var(--mono); font-size:12px; color:var(--danger); min-height:16px; }
@@ -133,6 +135,7 @@
     padding:7px 16px; cursor:pointer; border-radius:3px;
     font-family:var(--mono); font-size:12px; transition:.2s ease;
     white-space:nowrap; touch-action:manipulation; text-decoration:none; display:inline-block;
+    overflow:hidden; position:relative;
   }
   .btn:hover { background:var(--accent-dim); border-color:var(--accent); }
   .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
@@ -177,6 +180,7 @@
     font-family:var(--mono); font-size:11px; padding:3px 10px;
     border-radius:2px; border:1px solid var(--border); background:var(--bg);
     color:var(--text-dim); cursor:pointer; transition:.2s;
+    overflow:hidden; position:relative;
   }
   .profile-chip:hover { border-color:var(--accent); color:var(--accent); }
   .profile-chip.active { border-color:var(--accent); background:var(--accent-dim); color:var(--accent); }
@@ -198,6 +202,7 @@
   .empty { text-align:center; padding:28px 16px; color:var(--text-dim); font-family:var(--mono); font-size:12px; line-height:2; }
   .sep { height:1px; background:var(--border); margin:8px 0; }
   .hidden { display:none !important; }
+  .material-icons { font-size:18px; line-height:1; flex-shrink:0; vertical-align:middle; }
   code { background:rgba(0,0,0,0.4); padding:1px 6px; border-radius:2px; font-family:var(--mono); font-size:12px; }
 
   /* TOAST */
@@ -221,6 +226,10 @@
     .step-line { width:20px; }
     .step-label { display:none; }
   }
+
+  /* RIPPLE */
+  .ripple-wave { position:absolute; border-radius:50%; transform:scale(0); animation:ripple-anim .5s linear; background:rgba(255,255,255,0.18); pointer-events:none; z-index:9; }
+  @keyframes ripple-anim { to { transform:scale(4); opacity:0; } }
 </style>
 </head>
 <body>
@@ -245,7 +254,7 @@
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
-    <button class="btn" id="btn-theme" onclick="toggleTheme()" title="Alternar tema" style="padding:5px 11px;font-size:13px;">☀</button>
+    <button class="btn" id="btn-theme" onclick="toggleTheme()" title="Alternar tema" style="padding:5px 11px;font-size:13px;display:inline-flex;align-items:center;"><span class="material-icons">light_mode</span></button>
   </div>
 </header>
 
@@ -316,7 +325,7 @@
     </div>
 
     <div class="btn-row">
-      <button class="btn" onclick="goStep(1)">← Voltar</button>
+      <button class="btn" onclick="goStep(1)" style="display:inline-flex;align-items:center;gap:5px;"><span class="material-icons">arrow_back</span> Voltar</button>
       <div style="display:flex; gap:8px;">
         <button class="btn" onclick="startScan()">↺ Novo scan</button>
         <button class="btn primary" id="btn-s2-next" disabled onclick="goStep(3)">Configurar credenciais →</button>
@@ -335,7 +344,7 @@
       <div id="creds-list" style="display:flex; flex-direction:column; gap:14px;"></div>
     </div>
     <div class="btn-row">
-      <button class="btn" onclick="goStep(2)">← Voltar</button>
+      <button class="btn" onclick="goStep(2)" style="display:inline-flex;align-items:center;gap:5px;"><span class="material-icons">arrow_back</span> Voltar</button>
       <button class="btn primary" id="btn-s3-next" onclick="goStep(4)">Finalizar →</button>
     </div>
   </div>
@@ -1012,7 +1021,7 @@ function initTheme() {
   const dark = saved ? saved === 'dark' : prefersDark;
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = dark ? '☀' : '🌙';
+  if (btn) btn.innerHTML = dark ? '<span class="material-icons">light_mode</span>' : '<span class="material-icons">dark_mode</span>';
 }
 
 function toggleTheme() {
@@ -1020,8 +1029,21 @@ function toggleTheme() {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   localStorage.setItem('bit2cam_theme', dark ? 'dark' : 'light');
   const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = dark ? '☀' : '🌙';
+  if (btn) btn.innerHTML = dark ? '<span class="material-icons">light_mode</span>' : '<span class="material-icons">dark_mode</span>';
 }
+
+// ── RIPPLE ───────────────────────────────────────────────────────
+document.addEventListener('pointerdown', function(e) {
+  const btn = e.target.closest('.btn,.lock-btn,.profile-chip');
+  if (!btn) return;
+  const rect = btn.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height);
+  const rip  = document.createElement('span');
+  rip.className = 'ripple-wave';
+  rip.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-rect.left-size/2}px;top:${e.clientY-rect.top-size/2}px;`;
+  btn.appendChild(rip);
+  rip.addEventListener('animationend', () => rip.remove(), { once:true });
+});
 
 // ── INIT ─────────────────────────────────────────────────────────
 initTheme();
