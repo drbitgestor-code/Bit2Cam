@@ -141,13 +141,11 @@ do_update_html() {
     warn "Não foi possível reiniciar go2rtc — faça manualmente: systemctl restart go2rtc"
   fi
 
-  # Verificar que go2rtc está servindo o arquivo atualizado
-  sleep 1
-  if curl -fsSL --max-time 5 "http://localhost:${GO2RTC_PORT:-1984}/bit2cam.html" 2>/dev/null \
-      | grep -q 'RTCPeerConnection'; then
-    success "go2rtc está servindo bit2cam.html atualizado ✓"
+  # Verificar arquivo no disco
+  if grep -q 'RTCPeerConnection' "$WWW_DIR/bit2cam.html" 2>/dev/null; then
+    success "bit2cam.html em disco: versão WebRTC confirmada ✓"
   else
-    warn "Não foi possível verificar o conteúdo servido — acesse http://localhost:1984/bit2cam.html para confirmar"
+    warn "bit2cam.html pode estar desatualizado — execute novamente ou faça git pull no clone"
   fi
 }
 
