@@ -79,29 +79,38 @@ do_change_password() {
 _download_html() {
   local file="$1"
   local dest="$WWW_DIR/$file"
+  local tmp
+  tmp=$(mktemp /tmp/bit2cam_XXXXXX.html)
   local bust
   bust=$(date +%s)
 
   info "Baixando $file do GitHub..."
-  # ?t= evita cache do CDN do GitHub raw
-  if curl -fsSL --max-time 30 "${GITHUB_REPO}/${file}?t=${bust}" -o "$dest"; then
-    # Exibe APP_VERSION se presente no arquivo baixado
-    local ver
-    ver=$(grep -oP "APP_VERSION\s*=\s*'\K[^']+" "$dest" 2>/dev/null || true)
-    if [[ -n "$ver" ]]; then
-      success "$file atualizado (versão: $ver)"
+  if curl -fsSL --max-time 30 "${GITHUB_REPO}/${file}?t=${bust}" -o "$tmp" 2>/dev/null; then
+    local lines
+    lines=$(wc -l < "$tmp" 2>/dev/null || echo 0)
+    if [[ "$lines" -lt 50 ]]; then
+      rm -f "$tmp"
+      warn "$file: conteúdo inválido ($lines linhas) — usando cópia local"
     else
-      success "$file atualizado do GitHub"
+      mv "$tmp" "$dest"
+      local ver
+      ver=$(grep -oP "APP_VERSION\s*=\s*'\K[^']+" "$dest" 2>/dev/null || true)
+      success "$file atualizado do GitHub${ver:+ (versão: $ver)}"
+      return
     fi
   else
-    # fallback: cópia local se GitHub falhar
-    local src="$SCRIPT_DIR/$file"
-    if [[ -f "$src" ]]; then
-      cp "$src" "$dest"
-      warn "$file: GitHub falhou — copiado da versão local"
-    else
-      error "Falha ao baixar $file — verifique a conexão com o GitHub"
-    fi
+    rm -f "$tmp"
+    warn "$file: falha no download — usando cópia local"
+  fi
+
+  # fallback: cópia local
+  local src="$SCRIPT_DIR/$file"
+  if [[ -f "$src" ]]; then
+    cp "$src" "$dest"
+    warn "$file: copiado de $src"
+    warn "  → Para garantir a versão mais recente, faça git pull no diretório do projeto"
+  else
+    error "Falha ao obter $file — GitHub inacessível e sem cópia local em $SCRIPT_DIR"
   fi
 }
 
@@ -115,25 +124,31 @@ do_update_html() {
   _download_html "bit2cam.html"
   _download_html "setup.html"
 
-  # Re-injetar a senha preservada (ou manter a do arquivo baixado se não havia)
+  # Re-injetar a senha preservada
   if [[ -n "$current_hash" ]]; then
     sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$current_hash'/" "$WWW_DIR/setup.html"
     success "Senha preservada no novo setup.html"
   fi
 
   section "Reiniciando serviços"
-  systemctl restart go2rtc go2rtc-config-api 2>/dev/null \
-    || systemctl restart go2rtc 2>/dev/null \
-    || warn "Não foi possível reiniciar — faça manualmente: systemctl restart go2rtc"
-
-  sleep 1
-  if systemctl is-active --quiet go2rtc 2>/dev/null; then
-    success "go2rtc reiniciado"
+  if systemctl restart go2rtc 2>/dev/null; then
+    systemctl restart go2rtc-config-api 2>/dev/null || true
+    sleep 2
+    systemctl is-active --quiet go2rtc && success "go2rtc reiniciado" \
+      || warn "go2rtc não está ativo — verifique: journalctl -u go2rtc -n 20"
+    systemctl is-active --quiet go2rtc-config-api 2>/dev/null && success "go2rtc-config-api reiniciado" || true
   else
-    warn "go2rtc não está ativo — verifique: journalctl -u go2rtc -n 20"
+    warn "Não foi possível reiniciar go2rtc — faça manualmente: systemctl restart go2rtc"
   fi
-  if systemctl is-active --quiet go2rtc-config-api 2>/dev/null; then
-    success "go2rtc-config-api reiniciado"
+
+  # Verificar que go2rtc está servindo o arquivo atualizado
+  sleep 1
+  local served_lines
+  served_lines=$(curl -fsSL --max-time 5 "http://localhost:${GO2RTC_PORT:-1984}/bit2cam.html" 2>/dev/null | wc -l || echo 0)
+  if [[ "$served_lines" -gt 50 ]]; then
+    success "go2rtc está servindo bit2cam.html ($served_lines linhas) ✓"
+  else
+    warn "Não foi possível verificar o conteúdo servido — acesse http://localhost:1984/bit2cam.html para confirmar"
   fi
 }
 
