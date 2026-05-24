@@ -143,10 +143,9 @@ do_update_html() {
 
   # Verificar que go2rtc está servindo o arquivo atualizado
   sleep 1
-  local served_lines
-  served_lines=$(curl -fsSL --max-time 5 "http://localhost:${GO2RTC_PORT:-1984}/bit2cam.html" 2>/dev/null | wc -l || echo 0)
-  if [[ "$served_lines" -gt 50 ]]; then
-    success "go2rtc está servindo bit2cam.html ($served_lines linhas) ✓"
+  if curl -fsSL --max-time 5 "http://localhost:${GO2RTC_PORT:-1984}/bit2cam.html" 2>/dev/null \
+      | grep -q 'RTCPeerConnection'; then
+    success "go2rtc está servindo bit2cam.html atualizado ✓"
   else
     warn "Não foi possível verificar o conteúdo servido — acesse http://localhost:1984/bit2cam.html para confirmar"
   fi
