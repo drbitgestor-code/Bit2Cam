@@ -30,8 +30,8 @@
   /* HEADER */
   header { display:flex; align-items:center; justify-content:space-between; padding:0 14px; height:50px; background:var(--panel); border-bottom:1px solid var(--border); flex-shrink:0; z-index:200; gap:10px; }
   .header-left, .header-right { display:flex; align-items:center; gap:8px; }
-  .logo { font-family:var(--sans); font-weight:700; font-size:14px; color:var(--accent); letter-spacing:0.04em; white-space:nowrap; }
-  .logo-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent); margin-right:7px; animation:blink 2s infinite; }
+  .logo { font-family:var(--sans); font-weight:700; font-size:14px; color:var(--accent); letter-spacing:0.04em; white-space:nowrap; display:flex; align-items:center; gap:8px; }
+  .logo-dot { display:inline-block; width:6px; height:6px; flex-shrink:0; border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent); animation:blink 2s infinite; }
   @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
   .btn-icon { background:var(--bg3); border:1px solid var(--border); color:var(--accent); padding:5px 11px; cursor:pointer; border-radius:3px; font-family:var(--mono); font-size:13px; transition:.2s ease-out; white-space:nowrap; touch-action:manipulation; display:inline-flex; align-items:center; gap:5px; text-decoration:none; overflow:hidden; position:relative; }
@@ -117,7 +117,7 @@
   .drag-empty { padding:24px 16px; text-align:center; font-family:var(--mono); font-size:13px; color:var(--text-dim); line-height:1.9; }
 
   .sidebar-footer { padding:8px 10px; border-top:1px solid var(--border); display:flex; gap:6px; flex-shrink:0; }
-  .btn-sm { flex:1; padding:5px; background:var(--bg3); border:1px solid var(--border); color:var(--text-dim); font-family:var(--mono); font-size:12px; border-radius:3px; cursor:pointer; transition:all .15s ease-out; text-align:center; touch-action:manipulation; overflow:hidden; position:relative; }
+  .btn-sm { flex:1; padding:5px; background:var(--bg3); border:1px solid var(--border); color:var(--text-dim); font-family:var(--mono); font-size:12px; border-radius:3px; cursor:pointer; transition:all .15s ease-out; touch-action:manipulation; overflow:hidden; position:relative; display:inline-flex; align-items:center; justify-content:center; gap:4px; }
   .btn-sm:hover { border-color:var(--accent); color:var(--accent); }
   .btn-sm:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
   .btn-sm.danger:hover { border-color:var(--danger); color:var(--danger); }
@@ -412,7 +412,6 @@
     </div>
     <div class="modal-footer">
       <button class="btn-icon" id="btn-check-update" onclick="checkForUpdates(true)" type="button"><span class="material-icons">refresh</span> VERIFICAR AGORA</button>
-      <button class="btn-icon" onclick="closeAbout()" type="button"><span class="material-icons">close</span> FECHAR</button>
     </div>
   </div>
 </div>
@@ -857,9 +856,14 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') { closeFullscreen
 
 // ── SOBRE / VERIFICAÇÃO DE ATUALIZAÇÃO ───────────────────────────
 const GITHUB_API     = 'https://api.github.com/repos/drbitgestor-code/Bit2Cam/commits?path=bit2cam.html&per_page=1';
-const CHECK_INTERVAL = 7 * 24 * 60 * 60 * 1000; // 7 dias
-const LS_LAST_CHECK  = 'bit2cam_last_check';
-const LS_UPDATE_AVAIL = 'bit2cam_update_avail';
+const CHECK_INTERVAL  = 7 * 24 * 60 * 60 * 1000; // 7 dias
+const LS_LAST_CHECK   = 'bit2cam_last_check';
+const LS_LATEST_DATE  = 'bit2cam_latest_date'; // data do commit mais recente no GitHub
+
+function _storedHasUpdate() {
+  const d = localStorage.getItem(LS_LATEST_DATE) || '';
+  return d > APP_VERSION;
+}
 
 function openAbout() {
   document.getElementById('about-version').textContent = APP_VERSION;
@@ -870,7 +874,7 @@ function openAbout() {
   document.getElementById('about-last-check').textContent = lastCheck
     ? new Date(lastCheck).toLocaleString('pt-BR') : 'Nunca';
 
-  _renderUpdateStatus(localStorage.getItem(LS_UPDATE_AVAIL)==='1');
+  _renderUpdateStatus(_storedHasUpdate());
   document.getElementById('modal-sobre').classList.add('show');
 }
 
@@ -896,7 +900,9 @@ async function checkForUpdates(force=false) {
   const now = Date.now();
 
   if (!force && (now - lastCheck) < CHECK_INTERVAL) {
-    _applyBadge(localStorage.getItem(LS_UPDATE_AVAIL)==='1');
+    // Mesmo sem refazer a consulta, corrige o badge se a versão já foi atualizada
+    const hasUpdate = _storedHasUpdate();
+    _applyBadge(hasUpdate);
     return;
   }
 
@@ -915,7 +921,7 @@ async function checkForUpdates(force=false) {
     const hasUpdate  = !!commitDate && commitDate > APP_VERSION;
 
     localStorage.setItem(LS_LAST_CHECK, now.toString());
-    localStorage.setItem(LS_UPDATE_AVAIL, hasUpdate ? '1' : '0');
+    if (commitDate) localStorage.setItem(LS_LATEST_DATE, commitDate);
 
     const lcEl = document.getElementById('about-last-check');
     if (lcEl) lcEl.textContent = new Date(now).toLocaleString('pt-BR');
