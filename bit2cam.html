@@ -910,8 +910,9 @@ function openAbout() {
   document.getElementById('about-last-check').textContent = lastCheck
     ? new Date(lastCheck).toLocaleString('pt-BR') : 'Nunca';
 
-  _renderUpdateStatus(_storedHasUpdate());
+  _renderUpdateStatus(_storedHasUpdate()); // estado cacheado imediato
   document.getElementById('modal-sobre').classList.add('show');
+  checkForUpdates(true); // verifica no GitHub sempre que o modal abre
 }
 
 function closeAbout() {
