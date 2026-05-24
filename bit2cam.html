@@ -958,7 +958,8 @@ async function checkForUpdates(force=false) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    const commitDate = data[0]?.commit?.committer?.date?.slice(0,10) || '';
+    const rawDate    = data[0]?.commit?.committer?.date || '';
+    const commitDate = rawDate ? new Date(rawDate).toLocaleDateString('sv') : ''; // YYYY-MM-DD no fuso local
     const hasUpdate  = !!commitDate && commitDate > APP_VERSION;
 
     localStorage.setItem(LS_LAST_CHECK, now.toString());
