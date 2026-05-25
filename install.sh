@@ -109,8 +109,9 @@ info "Atualizando lista de pacotes..."
 apt-get update -qq
 
 PKGS=()
-command -v curl   &>/dev/null || PKGS+=(curl)
+command -v curl    &>/dev/null || PKGS+=(curl)
 command -v python3 &>/dev/null || PKGS+=(python3)
+command -v ffmpeg  &>/dev/null || PKGS+=(ffmpeg)
 
 if [[ ${#PKGS[@]} -gt 0 ]]; then
   info "Instalando: ${PKGS[*]}"
