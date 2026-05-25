@@ -144,6 +144,8 @@
   .btn.primary:hover { background:rgba(0,212,255,0.8); }
   .btn.success-btn { color:var(--success); border-color:rgba(0,255,136,0.3); }
   .btn.success-btn:hover { background:rgba(0,255,136,0.08); border-color:var(--success); }
+  .btn.danger { color:var(--danger); border-color:rgba(239,68,68,0.3); }
+  .btn.danger:hover { background:rgba(239,68,68,0.08); border-color:var(--danger); }
   .btn-row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
   .btn-row.end { justify-content:flex-end; }
 
@@ -284,6 +286,12 @@
       <div id="s1-info" class="hidden info-box success-box" style="margin-top:14px;"></div>
       <div id="s1-error" class="hidden info-box error-box" style="margin-top:14px;"></div>
     </div>
+
+    <div class="card hidden" id="installed-cams-card">
+      <div class="card-title">■ CÂMERAS INSTALADAS</div>
+      <div id="installed-cams-list"></div>
+    </div>
+
     <div class="btn-row end">
       <button class="btn primary" id="btn-s1-next" disabled onclick="goStep(2)">Escanear câmeras →</button>
     </div>
@@ -390,6 +398,67 @@ async function loadAlreadyAdded() {
     });
   } catch(_) {}
 }
+async function loadInstalledCams() {
+  const card = document.getElementById('installed-cams-card');
+  const list = document.getElementById('installed-cams-list');
+  try {
+    const r = await fetch(`${configApiBase()}/config`, { signal: AbortSignal.timeout(3000) });
+    if (!r.ok) { card.classList.add('hidden'); return; }
+    const cfg  = await r.json();
+    const cams = cfg?.cameras || [];
+    if (cams.length === 0) { card.classList.add('hidden'); return; }
+    list.innerHTML = '';
+    cams.forEach((cam, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = `display:flex;align-items:center;gap:10px;padding:10px 0;${i < cams.length-1 ? 'border-bottom:1px solid var(--border);' : ''}`;
+      row.innerHTML = `
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:var(--mono);font-size:13px;">${esc(cam.name)}</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">id: ${esc(cam.id)}${cam.hdId ? ' · hd: ' + esc(cam.hdId) : ''}</div>
+        </div>
+        <button class="btn danger" onclick="removeCam(${JSON.stringify(cam.id)},${JSON.stringify(cam.hdId||null)},${JSON.stringify(cam.uid)},${JSON.stringify(cam.name)})">Remover</button>
+      `;
+      list.appendChild(row);
+    });
+    card.classList.remove('hidden');
+  } catch(_) { card.classList.add('hidden'); }
+}
+
+async function removeCam(streamId, hdId, camUid, camName) {
+  if (!confirm(`Remover "${camName}" do sistema?\n\nIsso apagará o stream do go2rtc e a câmera do monitor.`)) return;
+
+  try {
+    await fetch(`${go2rtcBase()}/api/streams?name=${encodeURIComponent(streamId)}`,
+      { method: 'DELETE', signal: AbortSignal.timeout(5000) });
+  } catch(_) {}
+
+  if (hdId) {
+    try {
+      await fetch(`${go2rtcBase()}/api/streams?name=${encodeURIComponent(hdId)}`,
+        { method: 'DELETE', signal: AbortSignal.timeout(5000) });
+    } catch(_) {}
+  }
+
+  try {
+    const r = await fetch(`${configApiBase()}/config`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      const cfg = await r.json();
+      cfg.cameras      = (cfg.cameras      || []).filter(c => c.uid !== camUid);
+      cfg.selectedUids = (cfg.selectedUids || []).filter(u => u !== camUid);
+      const token   = localStorage.getItem('bit2cam_auth_token') || '';
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      await fetch(`${configApiBase()}/config`, {
+        method: 'POST', headers, body: JSON.stringify(cfg),
+        signal: AbortSignal.timeout(5000),
+      });
+    }
+  } catch(_) {}
+
+  toast(`"${camName}" removida`);
+  loadInstalledCams();
+}
+
 let camCfg         = {};  // uid → {displayName, user, pass, profile}
 let camTest        = {};  // uid → 'ok'|'err'|'testing'|null
 let camProfiles    = {};  // uid → [{name, url, ...}]
@@ -480,6 +549,7 @@ async function checkConnection() {
     infoEl.classList.remove('hidden');
     errEl.classList.add('hidden');
     btnNext.disabled = false;
+    loadInstalledCams();
 
   } catch (e) {
     statusEl.innerHTML = `<span class="dot red"></span><span>Não foi possível conectar ao go2rtc</span>`;
