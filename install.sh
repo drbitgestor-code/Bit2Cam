@@ -169,6 +169,9 @@ log:
 
 rtsp:
   listen: ":${RTSP_PORT}"
+
+ffmpeg:
+  bin: /usr/bin/ffmpeg
 EOF
   success "go2rtc.yaml criado"
 else
