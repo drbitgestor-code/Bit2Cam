@@ -141,12 +141,16 @@ section "Download go2rtc"
 GO2RTC_BIN="$INSTALL_DIR/go2rtc"
 GO2RTC_URL="https://github.com/AlexxIT/go2rtc/releases/latest/download/go2rtc_linux_${GO2RTC_ARCH}"
 
-info "Baixando go2rtc (última versão, $GO2RTC_ARCH)..."
-if ! curl -fsSL --progress-bar "$GO2RTC_URL" -o "$GO2RTC_BIN"; then
-  error "Falha ao baixar go2rtc de $GO2RTC_URL"
+if [[ -x "$GO2RTC_BIN" ]]; then
+  success "go2rtc já encontrado em $GO2RTC_BIN — pulando download"
+else
+  info "Baixando go2rtc (última versão, $GO2RTC_ARCH)..."
+  if ! curl -fsSL --progress-bar "$GO2RTC_URL" -o "$GO2RTC_BIN"; then
+    error "Falha ao baixar go2rtc de $GO2RTC_URL"
+  fi
+  chmod +x "$GO2RTC_BIN"
+  success "go2rtc instalado em $GO2RTC_BIN"
 fi
-chmod +x "$GO2RTC_BIN"
-success "go2rtc instalado em $GO2RTC_BIN"
 
 # ── CONFIG go2rtc ────────────────────────────────────────────────
 section "Configuração go2rtc"
