@@ -987,9 +987,10 @@ async function runFinish() {
 
     // ── 3c. Registrar na config do monitor ──
     addLog(logEl, 'running', `Adicionando "${displayName}" ao monitor…`);
+    if (!Array.isArray(appConfig.selectedUids)) appConfig.selectedUids = [];
+    const hasAudio = !!document.getElementById(`audio-${cam.uid}`)?.checked;
     const exists = appConfig.cameras.find(c => c.id === streamName && c.srvId === srv.id);
     if (!exists) {
-      const hasAudio = !!document.getElementById(`audio-${cam.uid}`)?.checked;
       const camEntry = { uid: mkUid(), id: streamName, hdId: hdStreamName, name: displayName, src: streamSrc, srvId: srv.id, hasAudio };
       appConfig.cameras.push(camEntry);
       if (!appConfig.selectedUids.includes(camEntry.uid)) {
@@ -997,7 +998,8 @@ async function runFinish() {
       }
       updateLastLog(logEl, 'ok', `✔ "${displayName}" adicionada ao monitor${hdStreamName ? ' + HD' : ''}`);
     } else {
-      updateLastLog(logEl, 'info', `○ "${displayName}" já existia no monitor`);
+      exists.hasAudio = hasAudio;
+      updateLastLog(logEl, 'info', `○ "${displayName}" já existia — hasAudio atualizado`);
     }
     setProgress();
   }
