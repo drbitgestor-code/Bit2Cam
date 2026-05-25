@@ -882,6 +882,10 @@ function toggleAudio(camUid) {
   const v   = document.getElementById(`gridv-${camUid}`);
   const btn = document.getElementById(`abtn-${camUid}`);
   if (!v) return;
+  if (!v.srcObject || v.srcObject.getAudioTracks().length === 0) {
+    toast('Sem track de áudio — go2rtc não está encaminhando áudio desta câmera');
+    return;
+  }
   v.muted = !v.muted;
   if (btn) {
     btn.querySelector('.material-icons').textContent = v.muted ? 'volume_off' : 'volume_up';
