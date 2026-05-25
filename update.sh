@@ -71,9 +71,12 @@ do_change_password() {
 
   local hash
   hash=$(echo -n "$pwd1" | sha256sum | awk '{print $1}')
-  sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$hash'/" "$WWW_DIR/setup.html"
-  sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$hash'/" "$WWW_DIR/bit2cam.html"
-  success "Senha do setup atualizada"
+  echo -n "$hash" > "$INSTALL_DIR/auth.hash"
+  chmod 640 "$INSTALL_DIR/auth.hash"
+  chown go2rtc:go2rtc "$INSTALL_DIR/auth.hash" 2>/dev/null || true
+  success "Senha atualizada em auth.hash"
+  info "Reiniciando config-api para aplicar nova senha..."
+  systemctl restart go2rtc-config-api 2>/dev/null || true
 }
 
 # ── ATUALIZAR HTMLs ──────────────────────────────────────────────
@@ -116,22 +119,64 @@ _download_html() {
   fi
 }
 
-do_update_html() {
-  section "Atualização de HTMLs"
+_download_py() {
+  local file="$1"
+  local dest="$INSTALL_DIR/$file"
+  local tmp
+  tmp=$(mktemp /tmp/bit2cam_XXXXXX.py)
+  local bust
+  bust=$(date +%s)
 
-  # Preservar hash da senha atual antes de sobrescrever o setup.html
-  local current_hash
-  current_hash=$(grep -oP "const SETUP_HASH = '\K[^']+" "$WWW_DIR/setup.html" 2>/dev/null || true)
+  info "Baixando $file do GitHub..."
+  if curl -fsSL --max-time 30 "${GITHUB_REPO}/${file}?t=${bust}" -o "$tmp" 2>/dev/null; then
+    local lines
+    lines=$(wc -l < "$tmp" 2>/dev/null || echo 0)
+    if [[ "$lines" -lt 20 ]]; then
+      rm -f "$tmp"
+      warn "$file: conteúdo inválido ($lines linhas) — usando cópia local"
+    else
+      mv "$tmp" "$dest"
+      chmod 750 "$dest"
+      chown go2rtc:go2rtc "$dest" 2>/dev/null || true
+      success "$file atualizado do GitHub"
+      return
+    fi
+  else
+    rm -f "$tmp"
+    warn "$file: falha no download — usando cópia local"
+  fi
+
+  local src="$SCRIPT_DIR/$file"
+  if [[ -f "$src" ]]; then
+    cp "$src" "$dest"
+    chmod 750 "$dest"
+    chown go2rtc:go2rtc "$dest" 2>/dev/null || true
+    warn "$file: copiado de $src"
+  else
+    warn "Falha ao obter $file — verifique manualmente"
+  fi
+}
+
+do_update_html() {
+  section "Atualização de HTMLs e serviços"
+
+  # Migração: se auth.hash não existe ainda (instalação antiga), extrair do HTML legado
+  if [[ ! -f "$INSTALL_DIR/auth.hash" ]]; then
+    local legacy_hash
+    legacy_hash=$(grep -oP "const SETUP_HASH = '\K[^']+" "$WWW_DIR/setup.html" 2>/dev/null || true)
+    if [[ -n "$legacy_hash" ]]; then
+      echo -n "$legacy_hash" > "$INSTALL_DIR/auth.hash"
+      chmod 640 "$INSTALL_DIR/auth.hash"
+      chown go2rtc:go2rtc "$INSTALL_DIR/auth.hash" 2>/dev/null || true
+      success "Senha migrada do HTML antigo para auth.hash"
+    else
+      warn "auth.hash não encontrado e HTML não contém hash — execute 'Alterar senha' após o update"
+    fi
+  fi
 
   _download_html "bit2cam.html"
   _download_html "setup.html"
-
-  # Re-injetar a senha preservada
-  if [[ -n "$current_hash" ]]; then
-    sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$current_hash'/" "$WWW_DIR/setup.html"
-    sed -i "s/const SETUP_HASH = '[^']*'/const SETUP_HASH = '$current_hash'/" "$WWW_DIR/bit2cam.html"
-    success "Senha preservada nos HTMLs"
-  fi
+  _download_py   "config-api.py"
 
   section "Reiniciando serviços"
   if systemctl restart go2rtc 2>/dev/null; then
