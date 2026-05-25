@@ -565,6 +565,17 @@ if [[ -z "$TAILSCALE_IP" ]]; then
   fi
 fi
 
+# ── UPDATE.SH ────────────────────────────────────────────────────
+section "Script de atualização"
+if [[ -f "$SCRIPT_DIR/update.sh" ]]; then
+  cp "$SCRIPT_DIR/update.sh" "$INSTALL_DIR/update.sh"
+  chmod +x "$INSTALL_DIR/update.sh"
+  chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/update.sh"
+  success "update.sh disponível em $INSTALL_DIR/update.sh"
+else
+  warn "update.sh não encontrado em $SCRIPT_DIR — copie manualmente para $INSTALL_DIR/"
+fi
+
 # ── RESUMO ───────────────────────────────────────────────────────
 LOCAL_IP=$(hostname -I | awk '{print $1}')
 
@@ -596,6 +607,7 @@ echo -e "    Instalação:  ${INSTALL_DIR}"
 echo -e "    Monitor:     ${WWW_DIR}/bit2cam.html"
 echo -e "    Config:      ${CONFIG_JSON}"
 echo -e "    go2rtc.yaml: ${GO2RTC_YAML}"
+echo -e "    Atualização: ${INSTALL_DIR}/update.sh"
 echo ""
 echo -e "  ${BOLD}Gerenciar serviços:${NC}"
 echo -e "    systemctl status  go2rtc go2rtc-config-api"
