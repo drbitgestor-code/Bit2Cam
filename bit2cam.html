@@ -633,8 +633,84 @@ function stopWebRTC(key) {
   if (_pcs[key]) { _pcs[key].close(); delete _pcs[key]; }
 }
 
+// ── MSE PLAYER (câmeras com áudio — passa AAC direto, sem transcodificação) ──
+const _mseAborts = {};
+
+function stopMSE(key) {
+  if (_mseAborts[key]) { _mseAborts[key].abort(); delete _mseAborts[key]; }
+}
+
+async function startMSE(videoEl, base, streamId, key) {
+  stopMSE(key);
+  stopWebRTC(key);
+  if (!/^https?:\/\//i.test(base)) return;
+
+  const ctrl = new AbortController();
+  _mseAborts[key] = ctrl;
+
+  const mse    = new MediaSource();
+  const objUrl = URL.createObjectURL(mse);
+  videoEl.src  = objUrl;
+
+  mse.addEventListener('sourceopen', async () => {
+    let sb;
+    const queue  = [];
+    const drain  = () => {
+      if (!sb || sb.updating || !queue.length) return;
+      try { sb.appendBuffer(queue.shift()); } catch(_) {}
+    };
+
+    try {
+      const res = await fetch(
+        `${base}/api/stream.mp4?src=${encodeURIComponent(streamId)}`,
+        { signal: ctrl.signal }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const reader = res.body.getReader();
+      const { value: init, done: d0 } = await reader.read();
+      if (d0 || ctrl.signal.aborted) return;
+
+      const mimes = [
+        'video/mp4; codecs="avc1.640033,mp4a.40.2"',
+        'video/mp4; codecs="avc1.640020,mp4a.40.2"',
+        'video/mp4; codecs="avc1.42E01E,mp4a.40.2"',
+        'video/mp4; codecs="avc1.640033"',
+        'video/mp4',
+      ];
+      for (const mime of mimes) {
+        if (MediaSource.isTypeSupported(mime)) {
+          try { sb = mse.addSourceBuffer(mime); break; } catch(_) {}
+        }
+      }
+      if (!sb) return;
+
+      sb.mode = 'sequence';
+      sb.addEventListener('updateend', drain);
+      queue.push(init);
+      drain();
+
+      while (!ctrl.signal.aborted) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        queue.push(value);
+        drain();
+      }
+    } catch(e) {
+      if (e.name !== 'AbortError') console.warn('MSE:', streamId, e.message);
+    } finally {
+      URL.revokeObjectURL(objUrl);
+      if (!ctrl.signal.aborted) {
+        delete _mseAborts[key];
+        setTimeout(() => { if (videoEl.isConnected) startMSE(videoEl, base, streamId, key); }, 5000);
+      }
+    }
+  }, { once: true });
+}
+
 function stopAllGridPcs() {
   Object.keys(_pcs).filter(k => k.startsWith('grid-')).forEach(stopWebRTC);
+  Object.keys(_mseAborts).filter(k => k.startsWith('grid-')).forEach(stopMSE);
 }
 // SYNC: manter idêntica em setup.html
 function esc(s) {
@@ -873,7 +949,10 @@ function applySelection() {
       </div>
     `;
     grid.appendChild(card);
-    startWebRTC(card.querySelector('video'), srvUrl(cam.srvId), cam.id, `grid-${cam.uid}`);
+    const _vid = card.querySelector('video');
+    cam.hasAudio
+      ? startMSE(_vid, srvUrl(cam.srvId), cam.id, `grid-${cam.uid}`)
+      : startWebRTC(_vid, srvUrl(cam.srvId), cam.id, `grid-${cam.uid}`);
   });
 }
 
@@ -882,10 +961,6 @@ function toggleAudio(camUid) {
   const v   = document.getElementById(`gridv-${camUid}`);
   const btn = document.getElementById(`abtn-${camUid}`);
   if (!v) return;
-  if (!v.srcObject || v.srcObject.getAudioTracks().length === 0) {
-    toast('Sem track de áudio — go2rtc não está encaminhando áudio desta câmera');
-    return;
-  }
   v.muted = !v.muted;
   if (btn) {
     btn.querySelector('.material-icons').textContent = v.muted ? 'volume_off' : 'volume_up';
@@ -915,12 +990,17 @@ function openFullscreen(camUid) {
   fsAudioBtn.querySelector('.material-icons').textContent = 'volume_off';
   fsAudioBtn.classList.remove('active');
   document.getElementById('fs-overlay').classList.add('open');
-  startWebRTC(fsVideo, srvUrl(cam.srvId), streamId, 'fs');
+  cam.hasAudio
+    ? startMSE(fsVideo, srvUrl(cam.srvId), streamId, 'fs')
+    : startWebRTC(fsVideo, srvUrl(cam.srvId), streamId, 'fs');
 }
 
 function closeFullscreen() {
   stopWebRTC('fs');
-  document.getElementById('fs-video').srcObject = null;
+  stopMSE('fs');
+  const fsv = document.getElementById('fs-video');
+  fsv.srcObject = null;
+  fsv.src = '';
   document.getElementById('fs-overlay').classList.remove('open');
 }
 
