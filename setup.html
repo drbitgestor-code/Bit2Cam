@@ -989,7 +989,7 @@ async function runFinish() {
     addLog(logEl, 'running', `Adicionando "${displayName}" ao monitor…`);
     const exists = appConfig.cameras.find(c => c.id === streamName && c.srvId === srv.id);
     if (!exists) {
-      const hasAudio = !!document.getElementById(`audio-${uid}`)?.checked;
+      const hasAudio = !!document.getElementById(`audio-${cam.uid}`)?.checked;
       const camEntry = { uid: mkUid(), id: streamName, hdId: hdStreamName, name: displayName, src: streamSrc, srvId: srv.id, hasAudio };
       appConfig.cameras.push(camEntry);
       if (!appConfig.selectedUids.includes(camEntry.uid)) {
