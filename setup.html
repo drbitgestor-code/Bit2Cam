@@ -416,8 +416,9 @@ async function loadInstalledCams() {
           <div style="font-family:var(--mono);font-size:13px;">${esc(cam.name)}</div>
           <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">id: ${esc(cam.id)}${cam.hdId ? ' · hd: ' + esc(cam.hdId) : ''}</div>
         </div>
-        <button class="btn danger" onclick="removeCam(${JSON.stringify(cam.id)},${JSON.stringify(cam.hdId||null)},${JSON.stringify(cam.uid)},${JSON.stringify(cam.name)})">Remover</button>
+        <button class="btn danger">Remover</button>
       `;
+      row.querySelector('button').addEventListener('click', () => removeCam(cam.id, cam.hdId || null, cam.uid, cam.name));
       list.appendChild(row);
     });
     card.classList.remove('hidden');
