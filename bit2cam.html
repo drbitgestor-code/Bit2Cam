@@ -148,6 +148,9 @@
   .cam-btn:hover { border-color:var(--accent); color:var(--accent); }
   .cam-btn.remove { border-color:rgba(255,59,59,0.4); color:var(--danger); }
   .cam-btn.remove:hover { background:rgba(255,59,59,0.2); border-color:var(--danger); }
+  .cam-btn.audio { color:var(--text-dim); }
+  .cam-btn.audio.active { color:var(--accent); border-color:var(--accent); }
+  .btn-icon.active { color:var(--accent); border-color:var(--accent); background:var(--accent-dim); }
   .cam-overlay { position:absolute; inset:0; z-index:50; cursor:pointer; }
   .cam-overlay:hover + .cam-btn-wrap, .cam-card:hover .cam-btn-wrap { opacity:1; }
 
@@ -367,6 +370,10 @@
       <div class="fs-dot"></div>
       <span id="fs-quality-label">STREAM ATIVO</span>
     </div>
+    <button class="btn-icon" id="fs-audio-btn" hidden title="Áudio"
+      onclick="const v=document.getElementById('fs-video');v.muted=!v.muted;this.querySelector('.material-icons').textContent=v.muted?'volume_off':'volume_up';this.classList.toggle('active',!v.muted);">
+      <span class="material-icons">volume_off</span>
+    </button>
     <span id="fs-srv" style="margin-left:auto;"></span>
   </div>
 </div>
@@ -861,12 +868,25 @@ function applySelection() {
       <video id="gridv-${esc(cam.uid)}" autoplay muted playsinline></video>
       <div class="cam-overlay" onclick="openFullscreen('${cam.uid}')" title="${cam.hdId?'Clique para fullscreen em HD':'Clique para fullscreen'}"></div>
       <div class="cam-btn-wrap">
+        ${cam.hasAudio?`<button class="cam-btn audio" id="abtn-${cam.uid}" onclick="event.stopPropagation();toggleAudio('${cam.uid}')" title="Áudio"><span class="material-icons" style="font-size:14px;">volume_off</span></button>`:''}
         <button class="cam-btn remove" onclick="event.stopPropagation();toggleCam('${camUid}');applySelection();" title="Remover"><span class="material-icons" style="font-size:14px;">close</span></button>
       </div>
     `;
     grid.appendChild(card);
     startWebRTC(card.querySelector('video'), srvUrl(cam.srvId), cam.id, `grid-${cam.uid}`);
   });
+}
+
+// ── ÁUDIO ────────────────────────────────────────────────────────
+function toggleAudio(camUid) {
+  const v   = document.getElementById(`gridv-${camUid}`);
+  const btn = document.getElementById(`abtn-${camUid}`);
+  if (!v) return;
+  v.muted = !v.muted;
+  if (btn) {
+    btn.querySelector('.material-icons').textContent = v.muted ? 'volume_off' : 'volume_up';
+    btn.classList.toggle('active', !v.muted);
+  }
 }
 
 // ── FULLSCREEN ───────────────────────────────────────────────────
@@ -883,8 +903,13 @@ function openFullscreen(camUid) {
   document.getElementById('fs-badge').innerHTML         = isHD ? `<span style="font-size:12px;padding:2px 5px;background:rgba(0,212,255,0.15);color:var(--accent);border:1px solid rgba(0,212,255,0.3);border-radius:2px;margin-left:4px;">ALTA RESOLUÇÃO</span>` : '';
   document.getElementById('fs-quality-label').textContent = isHD ? 'STREAM HD · ALTA RESOLUÇÃO' : 'STREAM PADRÃO';
   document.getElementById('fs-srv').textContent         = srvName(cam.srvId);
-  const fsVideo = document.getElementById('fs-video');
+  const fsVideo    = document.getElementById('fs-video');
+  const fsAudioBtn = document.getElementById('fs-audio-btn');
   fsVideo.srcObject = null;
+  fsVideo.muted     = true;
+  fsAudioBtn.hidden = !cam.hasAudio;
+  fsAudioBtn.querySelector('.material-icons').textContent = 'volume_off';
+  fsAudioBtn.classList.remove('active');
   document.getElementById('fs-overlay').classList.add('open');
   startWebRTC(fsVideo, srvUrl(cam.srvId), streamId, 'fs');
 }

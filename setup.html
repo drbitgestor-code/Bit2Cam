@@ -759,7 +759,7 @@ function renderCredsForms() {
 
   cams.forEach(cam => {
     if (!camCfg[cam.uid]) {
-      camCfg[cam.uid] = { displayName: cam.name, user: 'admin', pass: '', profileNormal: null, profileHd: null };
+      camCfg[cam.uid] = { displayName: cam.name, user: 'admin', pass: '', profileNormal: null, profileHd: null, hasAudio: false };
     }
     const cfg = camCfg[cam.uid];
     const uid = cam.uid;
@@ -788,6 +788,10 @@ function renderCredsForms() {
         <div style="align-self:flex-end;">
           <button class="btn" onclick="testCam('${uid}')">Testar</button>
         </div>
+      </div>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="audio-${esc(uid)}" ${cfg.hasAudio?'checked':''} style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer;">
+        <label for="audio-${esc(uid)}" style="font-family:var(--mono);font-size:11px;color:var(--text-dim);cursor:pointer;user-select:none;">Esta câmera tem áudio</label>
       </div>
       <div id="profiles-wrap-${esc(uid)}" class="hidden">
         <div style="margin-bottom:10px;">
@@ -985,7 +989,8 @@ async function runFinish() {
     addLog(logEl, 'running', `Adicionando "${displayName}" ao monitor…`);
     const exists = appConfig.cameras.find(c => c.id === streamName && c.srvId === srv.id);
     if (!exists) {
-      const camEntry = { uid: mkUid(), id: streamName, hdId: hdStreamName, name: displayName, src: streamSrc, srvId: srv.id };
+      const hasAudio = !!document.getElementById(`audio-${uid}`)?.checked;
+      const camEntry = { uid: mkUid(), id: streamName, hdId: hdStreamName, name: displayName, src: streamSrc, srvId: srv.id, hasAudio };
       appConfig.cameras.push(camEntry);
       if (!appConfig.selectedUids.includes(camEntry.uid)) {
         appConfig.selectedUids.push(camEntry.uid);
