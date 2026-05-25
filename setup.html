@@ -428,33 +428,35 @@ async function loadInstalledCams() {
 async function removeCam(streamId, hdId, camUid, camName) {
   if (!confirm(`Remover "${camName}" do sistema?\n\nIsso apagará o stream do go2rtc e a câmera do monitor.`)) return;
 
+  // go2rtc DELETE usa ?src= como identificador do stream (mesmo padrão do doRename)
   try {
-    await fetch(`${go2rtcBase()}/api/streams?name=${encodeURIComponent(streamId)}`,
+    const del = await fetch(`${go2rtcBase()}/api/streams?src=${encodeURIComponent(streamId)}`,
       { method: 'DELETE', signal: AbortSignal.timeout(5000) });
-  } catch(_) {}
+    if (!del.ok && del.status !== 404) toast(`Aviso: go2rtc retornou ${del.status} ao remover stream`);
+  } catch(e) { toast(`Erro ao remover stream: ${e.message}`); return; }
 
   if (hdId) {
     try {
-      await fetch(`${go2rtcBase()}/api/streams?name=${encodeURIComponent(hdId)}`,
+      await fetch(`${go2rtcBase()}/api/streams?src=${encodeURIComponent(hdId)}`,
         { method: 'DELETE', signal: AbortSignal.timeout(5000) });
     } catch(_) {}
   }
 
   try {
     const r = await fetch(`${configApiBase()}/config`, { signal: AbortSignal.timeout(3000) });
-    if (r.ok) {
-      const cfg = await r.json();
-      cfg.cameras      = (cfg.cameras      || []).filter(c => c.uid !== camUid);
-      cfg.selectedUids = (cfg.selectedUids || []).filter(u => u !== camUid);
-      const token   = localStorage.getItem('bit2cam_auth_token') || '';
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      await fetch(`${configApiBase()}/config`, {
-        method: 'POST', headers, body: JSON.stringify(cfg),
-        signal: AbortSignal.timeout(5000),
-      });
-    }
-  } catch(_) {}
+    if (!r.ok) { toast(`Erro ao ler config: HTTP ${r.status}`); return; }
+    const cfg = await r.json();
+    cfg.cameras      = (cfg.cameras      || []).filter(c => c.uid !== camUid && c.id !== streamId);
+    cfg.selectedUids = (cfg.selectedUids || []).filter(u => u !== camUid);
+    const token   = localStorage.getItem('bit2cam_auth_token') || '';
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const w = await fetch(`${configApiBase()}/config`, {
+      method: 'POST', headers, body: JSON.stringify(cfg),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!w.ok) { toast(`Erro ao salvar config: HTTP ${w.status}`); return; }
+  } catch(e) { toast(`Erro ao atualizar config: ${e.message}`); return; }
 
   toast(`"${camName}" removida`);
   loadInstalledCams();
