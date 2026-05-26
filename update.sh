@@ -85,11 +85,24 @@ _download_html() {
   local dest="$WWW_DIR/$file"
   local tmp
   tmp=$(mktemp /tmp/bit2cam_XXXXXX.html)
-  local bust
-  bust=$(date +%s)
 
   info "Baixando $file do GitHub..."
-  if curl -fsSL --max-time 30 "${GITHUB_REPO}/${file}?t=${bust}" -o "$tmp" 2>/dev/null; then
+
+  # Busca SHA do último commit que tocou este arquivo via API (bypassa CDN do Fastly)
+  # URL com SHA é imutável — nunca servida de cache antigo
+  local sha url
+  sha=$(curl -fsSL --max-time 10 \
+    "https://api.github.com/repos/drbitgestor-code/Bit2Cam/commits?path=${file}&per_page=1" \
+    2>/dev/null | grep -oP '"sha"\s*:\s*"\K[a-f0-9]{40}' | head -1)
+
+  if [[ -n "$sha" ]]; then
+    url="https://raw.githubusercontent.com/drbitgestor-code/Bit2Cam/${sha}/${file}"
+  else
+    url="${GITHUB_REPO}/${file}"
+    warn "$file: não foi possível obter SHA — usando URL do branch main"
+  fi
+
+  if curl -fsSL --max-time 30 "$url" -o "$tmp" 2>/dev/null; then
     local lines
     lines=$(wc -l < "$tmp" 2>/dev/null || echo 0)
     if [[ "$lines" -lt 50 ]]; then
