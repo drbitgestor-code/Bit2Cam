@@ -575,6 +575,38 @@ async function load() {
 
   renderAllList(); renderDragList(); updateSelCount();
   if (config.selectedUids.length > 0) applySelection();
+
+  if (fromApi) autoCorrectServerUrl();
+}
+
+async function autoCorrectServerUrl() {
+  const currentHost = window.location.hostname;
+  let changed = false;
+
+  for (const srv of config.servers) {
+    try {
+      const u = new URL(srv.url);
+      if (u.hostname === currentHost) continue;
+
+      // Tenta alcançar o servidor pelo URL armazenado
+      const reachable = await fetch(`${srv.url}/api/config`, { signal: AbortSignal.timeout(1500) })
+        .then(r => r.ok).catch(() => false);
+
+      if (!reachable) {
+        const oldUrl = srv.url;
+        srv.url = `${u.protocol}//${currentHost}:${u.port}`;
+        changed = true;
+        console.info(`[bit2cam] servidor "${srv.name}": ${oldUrl} → ${srv.url}`);
+      }
+    } catch(e) { /* URL inválida — ignora */ }
+  }
+
+  if (changed) {
+    await _pushToApi(getConfigAPIUrl());
+    renderAllList(); renderDragList();
+    if (config.selectedUids.length > 0) applySelection();
+    toast('Endereço do servidor atualizado automaticamente', 'ok');
+  }
 }
 
 // ── HELPERS ──────────────────────────────────────────────────────
