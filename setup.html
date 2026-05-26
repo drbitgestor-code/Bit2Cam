@@ -124,6 +124,7 @@
   }
   .input-ui:focus { border-color:var(--accent); }
   .input-ui::placeholder { color:var(--text-dim); }
+  select.input-ui { cursor:pointer; }
   .field-label { font-family:var(--mono); font-size:10px; color:var(--text-dim); display:block; margin-bottom:4px; letter-spacing:.05em; }
   .field-row { display:flex; gap:10px; align-items:flex-end; }
   .f1 { flex:1; }
@@ -335,9 +336,24 @@
 
     <div class="card">
       <div class="card-title">■ ADICIONAR VIA RTSP</div>
-      <div style="margin-bottom:10px;">
-        <label class="field-label">NOME DE EXIBIÇÃO</label>
-        <input class="input-ui" id="r-name" placeholder="Ex: Câmera Entrada">
+      <div class="field-row" style="margin-bottom:10px;">
+        <div class="f1">
+          <label class="field-label">FABRICANTE</label>
+          <select class="input-ui" id="r-fab" onchange="onRtspFabricante()">
+            <option value="">— selecione —</option>
+            <option value="intelbras">Intelbras</option>
+            <option value="hikvision">Hikvision</option>
+            <option value="dahua">Dahua</option>
+            <option value="axis">Axis</option>
+            <option value="reolink">Reolink</option>
+            <option value="giga">Giga</option>
+            <option value="outro">Outro (manual)</option>
+          </select>
+        </div>
+        <div class="f1">
+          <label class="field-label">NOME DE EXIBIÇÃO</label>
+          <input class="input-ui" id="r-name" placeholder="Ex: Câmera Entrada">
+        </div>
       </div>
       <div class="field-row" style="margin-bottom:10px;">
         <div class="f2">
@@ -361,13 +377,9 @@
       </div>
       <div style="margin-bottom:10px;">
         <label class="field-label">PATH RTSP</label>
-        <input class="input-ui" id="r-path" value="/cam/realmonitor?channel=1&subtype=0"
+        <input class="input-ui" id="r-path" placeholder="/cam/realmonitor?channel=1&subtype=0"
           onkeydown="if(event.key==='Enter')addRtsp()">
       </div>
-      <p style="font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:10px; line-height:1.9;">
-        Intelbras IM5: <code>/cam/realmonitor?channel=1&subtype=0</code><br>
-        Hikvision: <code>/Streaming/Channels/101</code>
-      </p>
       <div style="text-align:right;">
         <button class="btn" onclick="addRtsp()">+ Adicionar via RTSP</button>
       </div>
@@ -790,6 +802,25 @@ function addManual() {
   toast(`${ip} adicionado`);
 }
 
+const RTSP_PROFILES = {
+  intelbras: { port: '554', path: '/cam/realmonitor?channel=1&subtype=0' },
+  hikvision: { port: '554', path: '/Streaming/Channels/101' },
+  dahua:     { port: '554', path: '/cam/realmonitor?channel=1&subtype=0' },
+  axis:      { port: '554', path: '/axis-media/media.amp' },
+  reolink:   { port: '554', path: '/h264Preview_01_main' },
+  giga:      { port: '554', path: '/cam/realmonitor?channel=1&subtype=0' },
+  outro:     { port: '554', path: '' },
+};
+
+function onRtspFabricante() {
+  const fab = document.getElementById('r-fab').value;
+  const p   = RTSP_PROFILES[fab];
+  if (!p) return;
+  document.getElementById('r-port').value = p.port;
+  document.getElementById('r-path').value = p.path;
+  if (fab === 'outro') document.getElementById('r-path').focus();
+}
+
 function addRtsp() {
   const nameEl = document.getElementById('r-name');
   const ipEl   = document.getElementById('r-ip');
@@ -803,20 +834,21 @@ function addRtsp() {
   const user        = userEl.value.trim() || 'admin';
   const pass        = passEl.value.trim();
   const port        = portEl.value.trim() || '554';
-  const path        = pathEl.value.trim() || '/cam/realmonitor?channel=1&subtype=0';
+  const path        = pathEl.value.trim();
 
   if (!displayName) { toast('Informe o nome de exibição'); nameEl.focus(); return; }
   if (!ip)          { toast('Informe o IP da câmera');     ipEl.focus();   return; }
   if (!/^[\w.\-]+$/.test(ip)) { toast('IP/hostname inválido'); return; }
+  if (!path)        { toast('Informe o path RTSP');        pathEl.focus(); return; }
 
   const rtspUrl = `rtsp://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${ip}:${port}${path}`;
   const uid = mkUid();
   discoveredCams.push({ uid, ip, port, name: displayName, model: 'rtsp', rtspUser: user, rtspPass: pass, rtspPath: path, rawUrl: rtspUrl });
   selectedUids.add(uid);
 
+  document.getElementById('r-fab').value = '';
   nameEl.value = ''; ipEl.value = ''; userEl.value = 'admin';
-  passEl.value = ''; portEl.value = '554';
-  pathEl.value = '/cam/realmonitor?channel=1&subtype=0';
+  passEl.value = ''; portEl.value = '554'; pathEl.value = '';
   renderCamList();
   toast(`"${displayName}" adicionada (RTSP)`);
 }
