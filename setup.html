@@ -1168,7 +1168,7 @@ async function testCamRtsp(uid) {
     );
     if (!putRes.ok) throw new Error(`HTTP ${putRes.status}`);
 
-    await new Promise(r => setTimeout(r, 2500));
+    await new Promise(r => setTimeout(r, 4000));
 
     const streamsRes = await fetch(`${go2rtcBase()}/api/streams`, { signal: AbortSignal.timeout(4000) });
     const streams    = await streamsRes.json();
@@ -1182,11 +1182,11 @@ async function testCamRtsp(uid) {
       badge.className   = 'badge ok';
       camTest[uid]      = 'ok';
     } else if (producers.length > 0) {
-      badge.textContent = '⚠ URL válida — verifique no monitor';
-      badge.className   = 'badge testing';
-      camTest[uid]      = 'ok';
+      badge.textContent = '✕ credenciais recusadas — verifique usuário e senha';
+      badge.className   = 'badge err';
+      camTest[uid]      = 'err';
     } else {
-      badge.textContent = '✕ sem resposta do producer';
+      badge.textContent = '✕ câmera não respondeu — verifique IP e porta';
       badge.className   = 'badge err';
       camTest[uid]      = 'err';
     }
@@ -1389,13 +1389,22 @@ function updateLastLog(container, cls, msg) {
 
 // ── STEP 3 → 4: AVISO RTSP NÃO TESTADO ──────────────────────────
 function tryGoStep4() {
-  const untested = discoveredCams.filter(c =>
-    selectedUids.has(c.uid) && c.model === 'rtsp' && !camTest[c.uid]
-  );
+  const rtspSelected = discoveredCams.filter(c => selectedUids.has(c.uid) && c.model === 'rtsp');
+
+  const failed = rtspSelected.filter(c => camTest[c.uid] === 'err');
+  if (failed.length > 0) {
+    const names = failed.map(c => camCfg[c.uid]?.displayName || c.name).join('\n• ');
+    alert(`Não é possível finalizar — credenciais inválidas:\n• ${names}\n\nCorriga o usuário/senha e teste novamente antes de continuar.`);
+    return;
+  }
+
+  const untested = rtspSelected.filter(c => !camTest[c.uid]);
   if (untested.length > 0) {
     const names = untested.map(c => camCfg[c.uid]?.displayName || c.name).join('\n• ');
-    if (!confirm(`Câmeras RTSP não testadas:\n• ${names}\n\nSem o teste não é possível confirmar se a senha está correta.\n\nDeseja finalizar mesmo assim?`)) return;
+    alert(`Câmeras RTSP precisam ser testadas antes de continuar:\n• ${names}\n\nClique em "Testar" para verificar as credenciais.`);
+    return;
   }
+
   goStep(4);
 }
 
