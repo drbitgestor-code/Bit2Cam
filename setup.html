@@ -333,6 +333,46 @@
       </p>
     </div>
 
+    <div class="card">
+      <div class="card-title">■ ADICIONAR VIA RTSP</div>
+      <div style="margin-bottom:10px;">
+        <label class="field-label">NOME DE EXIBIÇÃO</label>
+        <input class="input-ui" id="r-name" placeholder="Ex: Câmera Entrada">
+      </div>
+      <div class="field-row" style="margin-bottom:10px;">
+        <div class="f2">
+          <label class="field-label">IP DA CÂMERA</label>
+          <input class="input-ui" id="r-ip" placeholder="192.168.1.100">
+        </div>
+        <div style="flex:0 0 80px;">
+          <label class="field-label">PORTA</label>
+          <input class="input-ui" id="r-port" value="554">
+        </div>
+      </div>
+      <div class="field-row" style="margin-bottom:10px;">
+        <div class="f1">
+          <label class="field-label">USUÁRIO</label>
+          <input class="input-ui" id="r-user" value="admin">
+        </div>
+        <div class="f1">
+          <label class="field-label">SENHA</label>
+          <input class="input-ui" type="password" id="r-pass" placeholder="••••••••">
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label class="field-label">PATH RTSP</label>
+        <input class="input-ui" id="r-path" value="/cam/realmonitor?channel=1&subtype=0"
+          onkeydown="if(event.key==='Enter')addRtsp()">
+      </div>
+      <p style="font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:10px; line-height:1.9;">
+        Intelbras IM5: <code>/cam/realmonitor?channel=1&subtype=0</code><br>
+        Hikvision: <code>/Streaming/Channels/101</code>
+      </p>
+      <div style="text-align:right;">
+        <button class="btn" onclick="addRtsp()">+ Adicionar via RTSP</button>
+      </div>
+    </div>
+
     <div class="btn-row">
       <button class="btn" onclick="goStep(1)" style="display:inline-flex;align-items:center;gap:5px;"><span class="material-icons">arrow_back</span> Voltar</button>
       <div style="display:flex; gap:8px;">
@@ -707,11 +747,11 @@ function renderCamList() {
 
     const detail = [
       cam.ip + (cam.port !== '80' ? `:${cam.port}` : ''),
-      cam.model && cam.model !== 'manual' ? cam.model : null,
+      cam.model === 'rtsp' ? 'RTSP' : (cam.model && cam.model !== 'manual' ? cam.model : null),
     ].filter(Boolean).join(' · ');
 
     div.innerHTML = `
-      <div class="cam-icon">📷</div>
+      <div class="cam-icon">${cam.model === 'rtsp' ? '🎥' : '📷'}</div>
       <div class="cam-info">
         <div class="cam-name">${esc(cam.name)}</div>
         <div class="cam-detail">${esc(detail)}</div>
@@ -750,6 +790,37 @@ function addManual() {
   toast(`${ip} adicionado`);
 }
 
+function addRtsp() {
+  const nameEl = document.getElementById('r-name');
+  const ipEl   = document.getElementById('r-ip');
+  const userEl = document.getElementById('r-user');
+  const passEl = document.getElementById('r-pass');
+  const portEl = document.getElementById('r-port');
+  const pathEl = document.getElementById('r-path');
+
+  const displayName = nameEl.value.trim();
+  const ip          = ipEl.value.trim();
+  const user        = userEl.value.trim() || 'admin';
+  const pass        = passEl.value.trim();
+  const port        = portEl.value.trim() || '554';
+  const path        = pathEl.value.trim() || '/cam/realmonitor?channel=1&subtype=0';
+
+  if (!displayName) { toast('Informe o nome de exibição'); nameEl.focus(); return; }
+  if (!ip)          { toast('Informe o IP da câmera');     ipEl.focus();   return; }
+  if (!/^[\w.\-]+$/.test(ip)) { toast('IP/hostname inválido'); return; }
+
+  const rtspUrl = `rtsp://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${ip}:${port}${path}`;
+  const uid = mkUid();
+  discoveredCams.push({ uid, ip, port, name: displayName, model: 'rtsp', rtspUser: user, rtspPass: pass, rtspPath: path, rawUrl: rtspUrl });
+  selectedUids.add(uid);
+
+  nameEl.value = ''; ipEl.value = ''; userEl.value = 'admin';
+  passEl.value = ''; portEl.value = '554';
+  pathEl.value = '/cam/realmonitor?channel=1&subtype=0';
+  renderCamList();
+  toast(`"${displayName}" adicionada (RTSP)`);
+}
+
 // ── STEP 3: CREDENCIAIS ───────────────────────────────────────────
 function renderCredsForms() {
   const listEl = document.getElementById('creds-list');
@@ -759,11 +830,56 @@ function renderCredsForms() {
   if (cams.length === 0) { goStep(2); return; }
 
   cams.forEach(cam => {
-    if (!camCfg[cam.uid]) {
-      camCfg[cam.uid] = { displayName: cam.name, user: 'admin', pass: '', profileNormal: null, profileHd: null, hasAudio: false };
-    }
-    const cfg = camCfg[cam.uid];
     const uid = cam.uid;
+
+    // ── RTSP camera ──
+    if (cam.model === 'rtsp') {
+      if (!camCfg[uid]) {
+        camCfg[uid] = { displayName: cam.name, user: cam.rtspUser, pass: cam.rtspPass, profileNormal: { url: cam.rawUrl }, profileHd: null, hasAudio: false };
+      }
+      const cfg = camCfg[uid];
+      const div = document.createElement('div');
+      div.className = 'cred-card';
+      div.innerHTML = `
+        <div class="cred-header">
+          <span class="cred-ip">🎥 ${esc(cam.ip)}:${esc(cam.port)} — RTSP</span>
+          <span class="badge idle" id="badge-${esc(uid)}">não testado</span>
+        </div>
+        <div style="margin-bottom:10px;">
+          <label class="field-label">NOME DE EXIBIÇÃO</label>
+          <input class="input-ui" id="dname-${esc(uid)}" value="${esc(cfg.displayName)}" placeholder="Ex: Câmera Entrada">
+        </div>
+        <div class="field-row" style="margin-bottom:10px;">
+          <div class="f1">
+            <label class="field-label">USUÁRIO</label>
+            <input class="input-ui" id="user-${esc(uid)}" value="${esc(cfg.user)}" placeholder="admin" autocomplete="username">
+          </div>
+          <div class="f1">
+            <label class="field-label">SENHA</label>
+            <input class="input-ui" type="password" id="pass-${esc(uid)}" value="${esc(cfg.pass)}" placeholder="••••••••"
+              autocomplete="current-password" onkeydown="if(event.key==='Enter')testCamRtsp('${uid}')">
+          </div>
+          <div style="align-self:flex-end;">
+            <button class="btn" onclick="testCamRtsp('${uid}')">Testar</button>
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);line-height:1.6;margin-bottom:8px;">
+          PATH: <code>${esc(cam.rtspPath)}</code>
+        </div>
+        <div style="margin-top:4px;display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="audio-${esc(uid)}" ${cfg.hasAudio?'checked':''} style="accent-color:var(--accent);width:14px;height:14px;cursor:pointer;">
+          <label for="audio-${esc(uid)}" style="font-family:var(--mono);font-size:11px;color:var(--text-dim);cursor:pointer;user-select:none;">Esta câmera tem áudio</label>
+        </div>
+      `;
+      listEl.appendChild(div);
+      return;
+    }
+
+    // ── ONVIF camera ──
+    if (!camCfg[uid]) {
+      camCfg[uid] = { displayName: cam.name, user: 'admin', pass: '', profileNormal: null, profileHd: null, hasAudio: false };
+    }
+    const cfg = camCfg[uid];
 
     const div = document.createElement('div');
     div.className = 'cred-card';
@@ -858,6 +974,61 @@ async function testCam(uid) {
     badge.className   = 'badge err';
     badge.title       = `Testado: onvif://...@${cam.ip}:${cam.port}`;
     document.getElementById(`profiles-wrap-${uid}`)?.classList.add('hidden');
+  }
+}
+
+async function testCamRtsp(uid) {
+  const cam = discoveredCams.find(c => c.uid === uid);
+  if (!cam) return;
+
+  const displayName = document.getElementById(`dname-${uid}`)?.value.trim() || cam.name;
+  const user        = document.getElementById(`user-${uid}`)?.value.trim()  || '';
+  const pass        = document.getElementById(`pass-${uid}`)?.value.trim()  || '';
+  const badge       = document.getElementById(`badge-${uid}`);
+
+  const rtspUrl = `rtsp://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${cam.ip}:${cam.port}${cam.rtspPath}`;
+  camCfg[uid] = { ...camCfg[uid], displayName, user, pass, profileNormal: { url: rtspUrl } };
+  camTest[uid] = 'testing';
+
+  badge.textContent = 'testando…';
+  badge.className   = 'badge testing';
+
+  const tmpName = `_rtsptmp_${uid.slice(-6)}`;
+
+  try {
+    const putRes = await fetch(
+      `${go2rtcBase()}/api/streams?name=${encodeURIComponent(tmpName)}&src=${encodeURIComponent(rtspUrl)}`,
+      { method: 'PUT', signal: AbortSignal.timeout(6000) }
+    );
+    if (!putRes.ok) throw new Error(`HTTP ${putRes.status}`);
+
+    await new Promise(r => setTimeout(r, 2500));
+
+    const streamsRes = await fetch(`${go2rtcBase()}/api/streams`, { signal: AbortSignal.timeout(4000) });
+    const streams    = await streamsRes.json();
+    const producers  = streams[tmpName]?.producers || [];
+
+    // Cleanup temp stream (non-blocking)
+    fetch(`${go2rtcBase()}/api/streams?src=${encodeURIComponent(tmpName)}`, { method: 'DELETE' }).catch(() => {});
+
+    if (producers.length > 0 && producers[0]?.state === 'connected') {
+      badge.textContent = '✓ stream conectado';
+      badge.className   = 'badge ok';
+      camTest[uid]      = 'ok';
+    } else if (producers.length > 0) {
+      badge.textContent = '⚠ URL válida — verifique no monitor';
+      badge.className   = 'badge testing';
+      camTest[uid]      = 'ok';
+    } else {
+      badge.textContent = '✕ sem resposta do producer';
+      badge.className   = 'badge err';
+      camTest[uid]      = 'err';
+    }
+  } catch(e) {
+    fetch(`${go2rtcBase()}/api/streams?src=${encodeURIComponent(tmpName)}`, { method: 'DELETE' }).catch(() => {});
+    badge.textContent = `✕ ${e.name === 'AbortError' ? 'timeout' : e.message}`;
+    badge.className   = 'badge err';
+    camTest[uid]      = 'err';
   }
 }
 
