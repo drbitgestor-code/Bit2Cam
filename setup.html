@@ -1168,11 +1168,21 @@ async function testCamRtsp(uid) {
     );
     if (!putRes.ok) throw new Error(`HTTP ${putRes.status}`);
 
-    await new Promise(r => setTimeout(r, 4000));
+    // Polling: verifica a cada 2s até 6s total
+    // Câmera com senha correta conecta em algum dos checks; senha errada nunca conecta
+    const checkState = async () => {
+      const res     = await fetch(`${go2rtcBase()}/api/streams`, { signal: AbortSignal.timeout(4000) });
+      const streams = await res.json();
+      return streams[tmpName]?.producers || [];
+    };
 
-    const streamsRes = await fetch(`${go2rtcBase()}/api/streams`, { signal: AbortSignal.timeout(4000) });
-    const streams    = await streamsRes.json();
-    const producers  = streams[tmpName]?.producers || [];
+    let producers = [];
+    for (let i = 0; i < 3; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      badge.textContent = `testando… (${i + 1}/3)`;
+      producers = await checkState();
+      if (producers[0]?.state === 'connected') break;
+    }
 
     // Cleanup temp stream (non-blocking)
     fetch(`${go2rtcBase()}/api/streams?src=${encodeURIComponent(tmpName)}`, { method: 'DELETE' }).catch(() => {});
