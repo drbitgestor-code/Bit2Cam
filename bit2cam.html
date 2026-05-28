@@ -470,7 +470,7 @@ let config = {
 };
 
 const STANDALONE_DATA = null;
-const APP_VERSION = '2026-05-23';
+const APP_VERSION = '2026-05-28';
 const STORAGE_KEY = 'bit2cam';
 const STORAGE_KEY_LEGACY = 'go2rtc_v23'; // migração de instâncias antigas
 let currentTab = 'all';
@@ -1022,9 +1022,18 @@ function openFullscreen(camUid) {
   fsAudioBtn.querySelector('.material-icons').textContent = 'volume_off';
   fsAudioBtn.classList.remove('active');
   document.getElementById('fs-overlay').classList.add('open');
-  cam.hasAudio
-    ? startMSE(fsVideo, srvUrl(cam.srvId), streamId, 'fs')
-    : startWebRTC(fsVideo, srvUrl(cam.srvId), streamId, 'fs');
+
+  // Câmera sem HD já tocando no grid → reusar stream existente (sem nova conexão)
+  const gridVideo = document.getElementById(`gridv-${cam.uid}`);
+  if (!isHD && gridVideo?.srcObject) {
+    stopWebRTC('fs');
+    stopMSE('fs');
+    fsVideo.srcObject = gridVideo.srcObject;
+  } else {
+    cam.hasAudio
+      ? startMSE(fsVideo, srvUrl(cam.srvId), streamId, 'fs')
+      : startWebRTC(fsVideo, srvUrl(cam.srvId), streamId, 'fs');
+  }
 }
 
 function closeFullscreen() {
