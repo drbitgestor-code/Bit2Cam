@@ -171,7 +171,7 @@
 
 <script>
 const LS_SERVERS = 'bit2cam_central_servers';
-const APP_VERSION = '2026-05-29b';
+const APP_VERSION = '2026-05-29c';
 const REFRESH_MS = 30_000;
 const HD_SUFFIX  = '_hd';
 const SRV_COLORS = ['#2563eb','#22c55e','#f59e0b','#ef4444','#a78bfa','#f97316','#38bdf8','#f43f5e'];
@@ -207,9 +207,14 @@ async function startWebRTC(videoEl,base,streamId,key,onAudio) {
   const pc=new RTCPeerConnection({iceServers:[]});
   _pcs[key]=pc;
   pc.ontrack=ev=>{
-    if (ev.streams?.[0]&&videoEl.srcObject!==ev.streams[0]) {
-      videoEl.srcObject=ev.streams[0];
+    if (ev.streams?.[0]) {
+      if (videoEl.srcObject!==ev.streams[0]) videoEl.srcObject=ev.streams[0];
       if (onAudio&&ev.streams[0].getAudioTracks().length>0) onAudio();
+    } else {
+      // Firefox: go2rtc usa SDP plan-b → ev.streams pode chegar vazio; monta stream manualmente
+      if (!videoEl.srcObject) videoEl.srcObject=new MediaStream();
+      videoEl.srcObject.addTrack(ev.track);
+      if (onAudio&&ev.track.kind==='audio') onAudio();
     }
   };
   pc.addTransceiver('video',{direction:'recvonly'});
