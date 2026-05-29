@@ -627,11 +627,12 @@ async function startWebRTC(videoEl, base, streamId, key) {
 
   pc.ontrack = ev => {
     if (ev.streams?.[0]) {
-      if (videoEl.srcObject !== ev.streams[0]) videoEl.srcObject = ev.streams[0];
+      if (videoEl.srcObject !== ev.streams[0]) { videoEl.srcObject = ev.streams[0]; videoEl.play().catch(() => {}); }
     } else {
       // Firefox: go2rtc usa SDP plan-b → ev.streams pode chegar vazio; monta stream manualmente
       if (!videoEl.srcObject) videoEl.srcObject = new MediaStream();
       videoEl.srcObject.addTrack(ev.track);
+      videoEl.play().catch(() => {});
     }
   };
 

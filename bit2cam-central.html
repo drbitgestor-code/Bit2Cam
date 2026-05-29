@@ -171,7 +171,7 @@
 
 <script>
 const LS_SERVERS = 'bit2cam_central_servers';
-const APP_VERSION = '2026-05-29c';
+const APP_VERSION = '2026-05-29d';
 const REFRESH_MS = 30_000;
 const HD_SUFFIX  = '_hd';
 const SRV_COLORS = ['#2563eb','#22c55e','#f59e0b','#ef4444','#a78bfa','#f97316','#38bdf8','#f43f5e'];
@@ -186,6 +186,8 @@ const _mseAborts = {};
 function mkUid() { return Math.random().toString(36).slice(2,10); }
 function esc(s)  { const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML; }
 function camDisplayName(id) { return id.replace(/_/g,' '); }
+// Se o nome salvo for uma URL (campo deixado em branco → padrão virou URL), exibe só o hostname
+function displaySrvName(name) { try { return new URL(name).hostname; } catch(_) { return name; } }
 function toast(msg,type='ok') {
   const el=document.getElementById('toast');
   el.textContent=msg; el.className=`toast show ${type}`;
@@ -208,12 +210,13 @@ async function startWebRTC(videoEl,base,streamId,key,onAudio) {
   _pcs[key]=pc;
   pc.ontrack=ev=>{
     if (ev.streams?.[0]) {
-      if (videoEl.srcObject!==ev.streams[0]) videoEl.srcObject=ev.streams[0];
+      if (videoEl.srcObject!==ev.streams[0]) { videoEl.srcObject=ev.streams[0]; videoEl.play().catch(()=>{}); }
       if (onAudio&&ev.streams[0].getAudioTracks().length>0) onAudio();
     } else {
       // Firefox: go2rtc usa SDP plan-b → ev.streams pode chegar vazio; monta stream manualmente
       if (!videoEl.srcObject) videoEl.srcObject=new MediaStream();
       videoEl.srcObject.addTrack(ev.track);
+      videoEl.play().catch(()=>{});
       if (onAudio&&ev.track.kind==='audio') onAudio();
     }
   };
@@ -338,7 +341,7 @@ function renderHeader() {
     const count=cameras.filter(c=>c.srvId===srv.id).length;
     return `<span class="srv-chip ${status}" style="color:${color};border-color:${color}55;">
       <span class="srv-chip-dot" style="background:${status==='online'?color:'#6b7280'};"></span>
-      ${esc(srv.name)}${status==='online'?` · ${count}`:''}
+      ${esc(displaySrvName(srv.name))}${status==='online'?` · ${count}`:''}
     </span>`;
   }).join('');
 }
@@ -374,7 +377,7 @@ function renderGrid() {
         <span class="cam-label-dot" style="background:${color};"></span>
         <span class="cam-label-text">${esc(cam.name)}</span>
         ${cam.hdId?'<span class="cam-label-hd">HD</span>':''}
-        <span class="cam-label-srv">${esc(cam.srvName)}</span>
+        <span class="cam-label-srv">${esc(displaySrvName(cam.srvName))}</span>
       </div>
       <video id="gridv-${cam.uid}" autoplay muted playsinline></video>
       <div class="cam-overlay" onclick="openFullscreen('${cam.uid}')" title="Clique para fullscreen${cam.hdId?' em HD':''}"></div>
@@ -488,7 +491,17 @@ function buildSrvRow(srv,idx,draft) {
     </div>`;
 
   row.querySelectorAll('input').forEach(inp=>{
-    inp.addEventListener('input',()=>{ draft[inp.dataset.idx][inp.dataset.field]=inp.value.trim(); });
+    inp.addEventListener('input',()=>{
+      const i=inp.dataset.idx; draft[i][inp.dataset.field]=inp.value.trim();
+      // Auto-preenche Nome se vazio ao digitar URL
+      if (inp.dataset.field==='url' && !draft[i].name) {
+        try {
+          const host=new URL(inp.value.trim()).hostname;
+          const nameInp=row.querySelector('input[data-field="name"]');
+          if (nameInp) { nameInp.value=host; draft[i].name=host; }
+        } catch(_){}
+      }
+    });
   });
   row.querySelector('[data-remove]').addEventListener('click',()=>{
     draft.splice(idx,1);
@@ -524,7 +537,7 @@ function saveConfig() {
   const list=document.getElementById('cfg-srv-list');
   const draft=(list._draft||[]).filter(s=>s.url.trim());
   // garantir IDs
-  draft.forEach(s=>{ if(!s.id) s.id=mkUid(); if(!s.name) s.name=s.url; });
+  draft.forEach(s=>{ if(!s.id) s.id=mkUid(); if(!s.name) try{ s.name=new URL(s.url).hostname; }catch(_){ s.name=s.url; } });
   servers=draft;
   saveServers();
   closeConfig();
