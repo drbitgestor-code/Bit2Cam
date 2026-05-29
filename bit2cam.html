@@ -635,9 +635,16 @@ async function startWebRTC(videoEl, base, streamId, key) {
   try {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
+    // Aguarda ICE gathering completo — Firefox envia offer sem candidatos (trickle ICE)
+    // go2rtc não suporta trickle; sem candidatos do browser o handshake ICE nunca fecha
+    await new Promise(resolve => {
+      if (pc.iceGatheringState === 'complete') { resolve(); return; }
+      pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === 'complete') resolve(); };
+      setTimeout(resolve, 2000); // fallback: 2s máx (host-only gathering é < 200ms)
+    });
     const res = await fetch(
       `${base}/api/webrtc?src=${encodeURIComponent(streamId)}`,
-      { method: 'POST', body: offer.sdp, headers: { 'Content-Type': 'application/sdp' }, signal: AbortSignal.timeout(10000) }
+      { method: 'POST', body: pc.localDescription.sdp, headers: { 'Content-Type': 'application/sdp' }, signal: AbortSignal.timeout(10000) }
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const answer = await res.text();
