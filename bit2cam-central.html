@@ -159,6 +159,14 @@
       <div class="modal-body">
         <div class="srv-list" id="cfg-srv-list"></div>
         <button class="btn-add" onclick="addSrvRow()"><span class="material-icons">add</span> Adicionar servidor</button>
+        <div id="cfg-hidden-section" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-family:var(--mono);font-size:12px;color:var(--text-dim);" id="cfg-hidden-label">0 câmeras ocultas</span>
+            <button class="btn-danger" onclick="restoreAll()" style="padding:3px 10px;">
+              <span class="material-icons" style="font-size:13px;">visibility</span> Restaurar todas
+            </button>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn-icon" onclick="closeConfig()">Cancelar</button>
@@ -171,7 +179,8 @@
 
 <script>
 const LS_SERVERS = 'bit2cam_central_servers';
-const APP_VERSION = '2026-05-29h';
+const LS_HIDDEN  = 'bit2cam_central_hidden';  // Set de "srvId:id" ocultos
+const APP_VERSION = '2026-05-29i';
 const REFRESH_MS = 30_000;
 const HD_SUFFIX  = '_hd';
 const SRV_COLORS = ['#2563eb','#22c55e','#f59e0b','#ef4444','#a78bfa','#f97316','#38bdf8','#f43f5e'];
@@ -179,6 +188,7 @@ const SRV_COLORS = ['#2563eb','#22c55e','#f59e0b','#ef4444','#a78bfa','#f97316',
 let servers   = [];  // { id, name, url }
 let cameras   = [];  // { uid, id, hdId, name, srvId, srvUrl, srvName, srvIdx, hasAudio }
 let srvStatus = {};  // { srvId: 'online'|'offline' }
+let hidden    = new Set(); // Set de "srvId:id" ocultos
 const _pcs       = {};
 const _wss       = {};
 const _mseAborts = {};
@@ -194,6 +204,13 @@ function toast(msg,type='ok') {
   el.textContent=msg; el.className=`toast show ${type}`;
   setTimeout(()=>el.classList.remove('show'),3200);
 }
+
+// ── Câmeras ocultas ───────────────────────────────────────────────
+function loadHidden()  { try { hidden=new Set(JSON.parse(localStorage.getItem(LS_HIDDEN)||'[]')); } catch(_){ hidden=new Set(); } }
+function saveHidden()  { localStorage.setItem(LS_HIDDEN, JSON.stringify([...hidden])); }
+function camKey(cam)   { return `${cam.srvId}:${cam.id}`; }
+function hideCam(cam)  { hidden.add(camKey(cam)); saveHidden(); renderGrid(); renderConfigHidden(); }
+function restoreAll()  { hidden.clear(); saveHidden(); renderGrid(); renderConfigHidden(); }
 
 // ── Persistência — tenta servers.json; fallback localStorage ─────
 let _configFromFile = false;
@@ -401,19 +418,22 @@ function renderGrid() {
     document.getElementById('empty-msg').textContent='Nenhum servidor configurado';
     empty.style.display='flex'; grid.style.display='none'; return;
   }
-  if (!cameras.length) {
-    document.getElementById('empty-msg').textContent='Nenhuma câmera encontrada — verifique os servidores';
+  const visible=cameras.filter(c=>!hidden.has(camKey(c)));
+
+  if (!visible.length) {
+    document.getElementById('empty-msg').textContent=
+      cameras.length ? `Todas as câmeras estão ocultas — restaure em ⚙ Servidores` : 'Nenhuma câmera encontrada — verifique os servidores';
     empty.style.display='flex'; grid.style.display='none'; return;
   }
   empty.style.display='none'; grid.style.display='grid';
 
-  const n=cameras.length;
+  const n=visible.length;
   const cols=Math.ceil(Math.sqrt(n));
   const rows=Math.ceil(n/cols);
   grid.style.gridTemplateColumns=`repeat(${cols},1fr)`;
   grid.style.gridTemplateRows=`repeat(${rows},1fr)`;
 
-  cameras.forEach(cam=>{
+  visible.forEach(cam=>{
     const color=SRV_COLORS[cam.srvIdx%SRV_COLORS.length];
     const card=document.createElement('div');
     card.className='cam-card';
@@ -430,6 +450,10 @@ function renderGrid() {
         <button class="cam-btn" id="abtn-${cam.uid}" style="display:none;" title="Áudio"
           onclick="event.stopPropagation();toggleAudio('${cam.uid}')">
           <span class="material-icons" style="font-size:14px;">volume_off</span>
+        </button>
+        <button class="cam-btn" title="Ocultar câmera"
+          onclick="event.stopPropagation();hideCam(cameras.find(c=>c.uid==='${cam.uid}'))">
+          <span class="material-icons" style="font-size:14px;">visibility_off</span>
         </button>
       </div>`;
     grid.appendChild(card);
@@ -492,8 +516,17 @@ function closeFullscreen() {
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeFullscreen(); closeConfig(); } });
 
 // ── Modal de configuração ─────────────────────────────────────────
+function renderConfigHidden() {
+  const n=hidden.size;
+  const sec=document.getElementById('cfg-hidden-section');
+  const lbl=document.getElementById('cfg-hidden-label');
+  sec.style.display=n?'block':'none';
+  if (lbl) lbl.textContent=`${n} câmera${n===1?'':'s'} oculta${n===1?'':'s'}`;
+}
+
 function openConfig() {
   renderConfigList();
+  renderConfigHidden();
   document.getElementById('modal-config').classList.add('open');
 }
 function closeConfig() {
@@ -623,6 +656,7 @@ document.addEventListener('fullscreenchange',()=>{
 
 // ── Init ──────────────────────────────────────────────────────────
 document.getElementById('hdr-ver').textContent = APP_VERSION;
+loadHidden();
 loadServers().then(()=>{
   renderHeader();
   if (!servers.length) {
