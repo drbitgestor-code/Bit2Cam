@@ -171,7 +171,7 @@
 
 <script>
 const LS_SERVERS = 'bit2cam_central_servers';
-const APP_VERSION = '2026-05-29d';
+const APP_VERSION = '2026-05-29e';
 const REFRESH_MS = 30_000;
 const HD_SUFFIX  = '_hd';
 const SRV_COLORS = ['#2563eb','#22c55e','#f59e0b','#ef4444','#a78bfa','#f97316','#38bdf8','#f43f5e'];
@@ -194,12 +194,31 @@ function toast(msg,type='ok') {
   setTimeout(()=>el.classList.remove('show'),3200);
 }
 
-// ── Persistência ─────────────────────────────────────────────────
-function loadServers() {
-  try { servers=JSON.parse(localStorage.getItem(LS_SERVERS)||'[]'); } catch(_){ servers=[]; }
+// ── Persistência — tenta servers.json; fallback localStorage ─────
+let _configFromFile = false;
+
+async function loadServers() {
+  try {
+    const r = await fetch('./servers.json', { cache: 'no-store' });
+    if (r.ok) {
+      const data = await r.json();
+      if (Array.isArray(data) && data.length) {
+        servers = data; _configFromFile = true; return;
+      }
+    }
+  } catch(_) {}
+  try { servers = JSON.parse(localStorage.getItem(LS_SERVERS) || '[]'); } catch(_) { servers = []; }
 }
-function saveServers() {
-  localStorage.setItem(LS_SERVERS, JSON.stringify(servers));
+
+async function saveServers() {
+  const json = JSON.stringify(servers, null, 2);
+  try {
+    const r = await fetch('./servers.json', { method: 'POST', body: json, headers: { 'Content-Type': 'application/json' } });
+    if (r.ok) { _configFromFile = true; return; }
+  } catch(_) {}
+  // Fallback: localStorage
+  localStorage.setItem(LS_SERVERS, json);
+  _configFromFile = false;
 }
 
 // ── WebRTC Player ─────────────────────────────────────────────────
@@ -539,7 +558,7 @@ function saveConfig() {
   // garantir IDs
   draft.forEach(s=>{ if(!s.id) s.id=mkUid(); if(!s.name) try{ s.name=new URL(s.url).hostname; }catch(_){ s.name=s.url; } });
   servers=draft;
-  saveServers();
+  saveServers().then(()=>{ toast(_configFromFile ? 'Salvo em servers.json' : 'Salvo em localStorage (inicie com central-server.py para persistir em arquivo)'); });
   closeConfig();
   srvStatus={};
   stopAllGrid();
@@ -578,16 +597,17 @@ document.addEventListener('fullscreenchange',()=>{
 
 // ── Init ──────────────────────────────────────────────────────────
 document.getElementById('hdr-ver').textContent = APP_VERSION;
-loadServers();
-renderHeader();
-if (!servers.length) {
-  document.getElementById('empty-state').style.display='flex';
-  document.getElementById('camera-grid').style.display='none';
-  openConfig(); // abre config automaticamente na primeira vez
-} else {
-  discoverAll();
-  setInterval(()=>discoverAll(true),REFRESH_MS);
-}
+loadServers().then(()=>{
+  renderHeader();
+  if (!servers.length) {
+    document.getElementById('empty-state').style.display='flex';
+    document.getElementById('camera-grid').style.display='none';
+    openConfig();
+  } else {
+    discoverAll();
+    setInterval(()=>discoverAll(true), REFRESH_MS);
+  }
+});
 </script>
 </body>
 </html>
