@@ -24,6 +24,7 @@
     /* ── Header ── */
     header{display:flex;align-items:center;gap:10px;padding:0 14px;height:48px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;}
     .hdr-title{font-family:var(--mono);font-size:14px;color:var(--accent);font-weight:500;letter-spacing:.03em;flex-shrink:0;}
+    .hdr-ver{font-family:var(--mono);font-size:10px;color:var(--text-dim);flex-shrink:0;}
     .hdr-servers{display:flex;gap:6px;flex:1;overflow:hidden;}
     .srv-chip{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid;white-space:nowrap;transition:opacity .3s;}
     .srv-chip.online{opacity:1;} .srv-chip.offline{opacity:.4;}
@@ -105,6 +106,7 @@
 <body>
   <header>
     <span class="hdr-title">● BIT2CAM CENTRAL</span>
+    <span class="hdr-ver" id="hdr-ver"></span>
     <div class="hdr-servers" id="hdr-servers"></div>
     <button class="btn-icon" onclick="openConfig()" title="Configurar servidores"><span class="material-icons">settings</span></button>
     <button class="btn-icon" onclick="toggleTheme()" id="btn-theme" title="Tema"><span class="material-icons">light_mode</span></button>
@@ -166,6 +168,7 @@
 
 <script>
 const LS_SERVERS = 'bit2cam_central_servers';
+const APP_VERSION = '2026-05-29';
 const REFRESH_MS = 30_000;
 const HD_SUFFIX  = '_hd';
 const SRV_COLORS = ['#2563eb','#22c55e','#f59e0b','#ef4444','#a78bfa','#f97316','#38bdf8','#f43f5e'];
@@ -220,9 +223,11 @@ async function startWebRTC(videoEl,base,streamId,key,onAudio) {
     const res=await fetch(`${base}/api/webrtc?src=${encodeURIComponent(streamId)}`,
       {method:'POST',body:pc.localDescription.sdp,headers:{'Content-Type':'application/sdp'},signal:AbortSignal.timeout(10000)});
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const answer=await res.text();
+    // Remove linhas duplicadas — go2rtc emite rtcp-fb duplicados; Firefox rejeita SDP inválido
+    const seen=new Set();
+    const sdpAnswer=(await res.text()).split('\r\n').filter(l=>!seen.has(l)&&seen.add(l)).join('\r\n');
     if (_pcs[key]!==pc) return;
-    await pc.setRemoteDescription({type:'answer',sdp:answer});
+    await pc.setRemoteDescription({type:'answer',sdp:sdpAnswer});
   } catch(_) {
     if (_pcs[key]===pc) {
       pc.close(); delete _pcs[key];
@@ -547,6 +552,7 @@ document.addEventListener('fullscreenchange',()=>{
 });
 
 // ── Init ──────────────────────────────────────────────────────────
+document.getElementById('hdr-ver').textContent = APP_VERSION;
 loadServers();
 renderHeader();
 if (!servers.length) {
