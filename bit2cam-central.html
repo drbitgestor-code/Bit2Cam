@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Bit2Cam Central</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#111827; --bg2:#1f2937; --bg3:#374151;
+      --text:#f9fafb; --text-dim:#9ca3af;
+      --accent:#2563eb; --border:#374151; --panel:#1f2937;
+      --danger:#ef4444;
+      --mono:'JetBrains Mono',monospace;
+      --sans:'Inter',sans-serif;
+    }
+    [data-theme="light"] {
+      --bg:#f9fafb; --bg2:#f3f4f6; --bg3:#e5e7eb;
+      --text:#111827; --text-dim:#6b7280;
+      --border:#d1d5db; --panel:#ffffff;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:var(--sans);height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+
+    /* ── Header ── */
+    header{display:flex;align-items:center;gap:10px;padding:0 14px;height:48px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;}
+    .hdr-title{font-family:var(--mono);font-size:14px;color:var(--accent);font-weight:500;letter-spacing:.03em;flex-shrink:0;}
+    .hdr-servers{display:flex;gap:6px;flex:1;overflow:hidden;flex-wrap:nowrap;}
+    .srv-chip{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid;white-space:nowrap;transition:opacity .3s;}
+    .srv-chip.online{opacity:1;}
+    .srv-chip.offline{opacity:.4;}
+    .srv-chip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+    .btn-icon{background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:4px;padding:4px 8px;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:12px;font-family:var(--mono);transition:.15s;white-space:nowrap;flex-shrink:0;}
+    .btn-icon:hover{border-color:var(--accent);color:var(--accent);}
+    .btn-icon .material-icons{font-size:16px;}
+
+    /* ── Grid ── */
+    .grid-wrap{flex:1;overflow:hidden;}
+    #camera-grid{display:grid;width:100%;height:100%;gap:2px;}
+
+    /* ── Camera card ── */
+    .cam-card{position:relative;background:#000;overflow:hidden;}
+    .cam-card video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;}
+    .cam-card::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(to bottom,transparent 0,transparent 3px,rgba(0,0,0,.06) 3px,rgba(0,0,0,.06) 4px);pointer-events:none;z-index:3;}
+    .cam-label{position:absolute;top:6px;left:6px;z-index:4;display:flex;align-items:center;gap:4px;background:rgba(0,0,0,.65);padding:2px 7px 2px 5px;border-radius:3px;pointer-events:none;max-width:calc(100% - 16px);}
+    .cam-label-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+    .cam-label-text{font-family:var(--mono);font-size:11px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .cam-label-hd{font-size:10px;padding:0 3px;background:rgba(0,212,255,.15);color:#00d4ff;border:1px solid rgba(0,212,255,.3);border-radius:2px;flex-shrink:0;}
+    .cam-label-srv{font-size:10px;color:rgba(255,255,255,.45);flex-shrink:0;}
+    .cam-overlay{position:absolute;inset:0;z-index:50;cursor:pointer;}
+    .cam-btn-wrap{position:absolute;top:6px;right:6px;z-index:100;display:flex;gap:4px;opacity:0;transition:.2s;}
+    .cam-card:hover .cam-btn-wrap{opacity:1;}
+    .cam-btn{width:24px;height:24px;background:rgba(0,0,0,.8);border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.15);color:var(--text);transition:.15s;}
+    .cam-btn:hover{border-color:var(--accent);color:var(--accent);}
+    .cam-btn.active{color:var(--accent);border-color:var(--accent);}
+
+    /* ── Fullscreen overlay ── */
+    .fs-overlay{position:fixed;inset:0;background:#000;z-index:500;display:none;flex-direction:column;}
+    .fs-overlay.open{display:flex;}
+    .fs-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;}
+    .fs-title{font-family:var(--mono);font-size:15px;color:var(--accent);display:flex;align-items:center;gap:8px;}
+    .fs-body{flex:1;position:relative;}
+    .fs-body video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;}
+    .fs-overlay-block{position:absolute;inset:0;z-index:10;}
+    .fs-footer{padding:8px 16px;background:var(--panel);border-top:1px solid var(--border);font-family:var(--mono);font-size:13px;color:var(--text-dim);display:flex;align-items:center;gap:12px;flex-shrink:0;}
+    .fs-quality{display:flex;align-items:center;gap:5px;}
+    .fs-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;}
+
+    /* ── Empty / offline ── */
+    .empty-state{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;color:var(--text-dim);gap:12px;}
+    .empty-state .material-icons{font-size:48px;}
+    .empty-state p{font-family:var(--mono);font-size:13px;}
+
+    /* ── Toast ── */
+    .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg3);color:var(--text);padding:8px 16px;border-radius:4px;font-size:13px;opacity:0;transition:.3s;z-index:9999;border:1px solid var(--border);white-space:nowrap;pointer-events:none;}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+    .toast.err{border-color:var(--danger);}
+
+    /* ── Page fullscreen ── */
+    body.fs-mode header{display:none;}
+    body.fs-mode .grid-wrap{height:100dvh;}
+  </style>
+</head>
+<body>
+  <header>
+    <span class="hdr-title">● BIT2CAM CENTRAL</span>
+    <div class="hdr-servers" id="hdr-servers"></div>
+    <button class="btn-icon" onclick="toggleTheme()" id="btn-theme" title="Tema"><span class="material-icons">light_mode</span></button>
+    <button class="btn-icon" id="btn-fullscreen" onclick="togglePageFullscreen()" title="Tela cheia"><span class="material-icons">fullscreen</span></button>
+  </header>
+
+  <div class="grid-wrap" id="grid-wrap">
+    <div id="camera-grid" class="camera-grid"></div>
+    <div id="empty-state" class="empty-state">
+      <span class="material-icons">videocam_off</span>
+      <p>Nenhuma câmera encontrada</p>
+      <p style="font-size:11px;margin-top:-4px;">Verifique os IPs em CENTRAL_SERVERS</p>
+    </div>
+  </div>
+
+  <div class="fs-overlay" id="fs-overlay">
+    <div class="fs-header">
+      <div class="fs-title">
+        <span id="fs-dot" style="width:8px;height:8px;border-radius:50%;flex-shrink:0;"></span>
+        <span id="fs-name">CÂMERA</span>
+        <span id="fs-badge"></span>
+      </div>
+      <button class="btn-icon" onclick="closeFullscreen()" type="button"><span class="material-icons">close</span> FECHAR</button>
+    </div>
+    <div class="fs-body">
+      <video id="fs-video" autoplay muted playsinline></video>
+      <div class="fs-overlay-block"></div>
+    </div>
+    <div class="fs-footer">
+      <div class="fs-quality"><div class="fs-dot"></div><span id="fs-quality-label">STREAM ATIVO</span></div>
+      <button class="btn-icon" id="fs-audio-btn" hidden title="Áudio"
+        onclick="const v=document.getElementById('fs-video');v.muted=!v.muted;this.querySelector('.material-icons').textContent=v.muted?'volume_off':'volume_up';this.classList.toggle('active',!v.muted);">
+        <span class="material-icons">volume_off</span>
+      </button>
+      <span id="fs-srv" style="margin-left:auto;"></span>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+// CONFIGURAÇÃO — editar para adicionar/remover galpões
+// Use os IPs Tailscale de cada servidor (ex: 100.64.0.1)
+// NÃO abrir como file:// — requer um servidor HTTP:
+//   python3 -m http.server 8080   →   http://localhost:8080/bit2cam-central.html
+// ─────────────────────────────────────────────────────────────────
+const CENTRAL_SERVERS = [
+  { id: 's1', name: 'Galpão A', url: 'http://100.64.0.1:1984' },
+  // { id: 's2', name: 'Galpão B', url: 'http://100.64.0.2:1984' },
+  // { id: 's3', name: 'Galpão C', url: 'http://100.64.0.3:1984' },
+];
+// ─────────────────────────────────────────────────────────────────
+
+const REFRESH_MS = 30_000;
+const HD_SUFFIX  = '_hd';
+const SRV_COLORS = ['#2563eb','#22c55e','#f59e0b','#ef4444','#a78bfa','#f97316','#38bdf8','#f43f5e'];
+
+let cameras   = []; // { uid, id, hdId, name, srvId, srvUrl, srvName, srvIdx, hasAudio }
+let srvStatus = {}; // { srvId: 'online'|'offline' }
+const _pcs       = {};
+const _mseAborts = {};
+
+// ── Utilidades ────────────────────────────────────────────────────
+function mkUid() { return Math.random().toString(36).slice(2,10); }
+function esc(s)  { const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML; }
+function camDisplayName(id) { return id.replace(/_/g,' '); }
+
+function toast(msg,type='ok') {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className=`toast show ${type}`;
+  setTimeout(()=>el.classList.remove('show'),3200);
+}
+
+// ── WebRTC Player ─────────────────────────────────────────────────
+async function startWebRTC(videoEl, base, streamId, key, onAudio) {
+  stopWebRTC(key);
+  if (!/^https?:\/\//i.test(base)) return;
+  const pc = new RTCPeerConnection({iceServers:[]});
+  _pcs[key] = pc;
+  pc.ontrack = ev => {
+    if (ev.streams?.[0] && videoEl.srcObject !== ev.streams[0]) {
+      videoEl.srcObject = ev.streams[0];
+      if (onAudio && ev.streams[0].getAudioTracks().length > 0) onAudio();
+    }
+  };
+  pc.addTransceiver('video',{direction:'recvonly'});
+  pc.addTransceiver('audio',{direction:'recvonly'});
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const res = await fetch(`${base}/api/webrtc?src=${encodeURIComponent(streamId)}`,
+      {method:'POST',body:offer.sdp,headers:{'Content-Type':'application/sdp'},signal:AbortSignal.timeout(10000)});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const answer = await res.text();
+    if (_pcs[key] !== pc) return;
+    await pc.setRemoteDescription({type:'answer',sdp:answer});
+  } catch(_) {
+    if (_pcs[key]===pc) {
+      pc.close(); delete _pcs[key];
+      setTimeout(()=>{ if(videoEl.isConnected) startWebRTC(videoEl,base,streamId,key,onAudio); },5000);
+    }
+    return;
+  }
+  pc.onconnectionstatechange = () => {
+    if ((pc.connectionState==='failed'||pc.connectionState==='disconnected') && _pcs[key]===pc) {
+      pc.close(); delete _pcs[key];
+      setTimeout(()=>{ if(videoEl.isConnected) startWebRTC(videoEl,base,streamId,key,onAudio); },5000);
+    }
+  };
+}
+function stopWebRTC(key) { if(_pcs[key]){_pcs[key].close();delete _pcs[key];} }
+
+// ── MSE Player ────────────────────────────────────────────────────
+function stopMSE(key) { if(_mseAborts[key]){_mseAborts[key].abort();delete _mseAborts[key];} }
+async function startMSE(videoEl, base, streamId, key) {
+  stopMSE(key); stopWebRTC(key);
+  if (!/^https?:\/\//i.test(base)) return;
+  const ctrl = new AbortController();
+  _mseAborts[key] = ctrl;
+  const mse = new MediaSource();
+  const objUrl = URL.createObjectURL(mse);
+  videoEl.src = objUrl;
+  mse.addEventListener('sourceopen', async () => {
+    let sb; const queue=[];
+    const drain=()=>{ if(!sb||sb.updating||!queue.length) return; try{sb.appendBuffer(queue.shift());}catch(_){} };
+    try {
+      const res = await fetch(`${base}/api/stream.mp4?src=${encodeURIComponent(streamId)}`,{signal:ctrl.signal});
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const reader = res.body.getReader();
+      const {value:init,done:d0} = await reader.read();
+      if (d0||ctrl.signal.aborted) return;
+      const mimes=['video/mp4; codecs="avc1.640033,mp4a.40.2"','video/mp4; codecs="avc1.640020,mp4a.40.2"','video/mp4; codecs="avc1.42E01E,mp4a.40.2"','video/mp4; codecs="avc1.640033"','video/mp4'];
+      for (const mime of mimes) {
+        if (MediaSource.isTypeSupported(mime)) { try{sb=mse.addSourceBuffer(mime);break;}catch(_){} }
+      }
+      if (!sb) return;
+      sb.mode='sequence'; sb.addEventListener('updateend',drain);
+      queue.push(init); drain();
+      while (!ctrl.signal.aborted) {
+        const {value,done}=await reader.read();
+        if (done) break;
+        queue.push(value); drain();
+      }
+    } catch(e) {
+      if (e.name!=='AbortError') console.warn('MSE:',streamId,e.message);
+    } finally {
+      URL.revokeObjectURL(objUrl);
+      if (!ctrl.signal.aborted) {
+        delete _mseAborts[key];
+        setTimeout(()=>{ if(videoEl.isConnected) startMSE(videoEl,base,streamId,key); },5000);
+      }
+    }
+  },{once:true});
+}
+
+// ── Discovery ─────────────────────────────────────────────────────
+async function discoverServer(srv, idx) {
+  try {
+    const res = await fetch(`${srv.url}/api/streams`,{signal:AbortSignal.timeout(3000)});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const streams = await res.json();
+    const names   = Object.keys(streams);
+    const hdSet   = new Set(names.filter(n=>n.endsWith(HD_SUFFIX)));
+    const cams    = names
+      .filter(n=>!n.endsWith(HD_SUFFIX))
+      .map(id=>({
+        uid:     mkUid(),
+        id,
+        hdId:    hdSet.has(id+HD_SUFFIX) ? id+HD_SUFFIX : null,
+        name:    camDisplayName(id),
+        srvId:   srv.id,
+        srvUrl:  srv.url,
+        srvName: srv.name,
+        srvIdx:  idx,
+        hasAudio: false,
+      }));
+    srvStatus[srv.id]='online';
+    return cams;
+  } catch(_) {
+    srvStatus[srv.id]='offline';
+    return [];
+  }
+}
+
+async function discoverAll(isRefresh=false) {
+  const results = await Promise.all(CENTRAL_SERVERS.map((srv,i)=>discoverServer(srv,i)));
+  const newCams = results.flat();
+
+  if (isRefresh) {
+    const oldKey = cameras.map(c=>`${c.srvId}:${c.id}`).sort().join(',');
+    const newKey = newCams.map(c=>`${c.srvId}:${c.id}`).sort().join(',');
+    renderHeader();
+    if (oldKey===newKey) return; // nada mudou, não interrompe streams
+    stopAllGrid();
+  }
+
+  cameras = newCams;
+  renderHeader();
+  renderGrid();
+}
+
+function stopAllGrid() {
+  Object.keys(_pcs).filter(k=>k.startsWith('grid-')).forEach(stopWebRTC);
+  Object.keys(_mseAborts).filter(k=>k.startsWith('grid-')).forEach(stopMSE);
+}
+
+// ── Render Header ─────────────────────────────────────────────────
+function renderHeader() {
+  document.getElementById('hdr-servers').innerHTML = CENTRAL_SERVERS.map((srv,i)=>{
+    const color  = SRV_COLORS[i%SRV_COLORS.length];
+    const status = srvStatus[srv.id]||'offline';
+    const count  = cameras.filter(c=>c.srvId===srv.id).length;
+    return `<span class="srv-chip ${status}" style="color:${color};border-color:${color}55;">
+      <span class="srv-chip-dot" style="background:${status==='online'?color:'#6b7280'};"></span>
+      ${esc(srv.name)}${status==='online'?` · ${count}`:''}
+    </span>`;
+  }).join('');
+}
+
+// ── Render Grid ───────────────────────────────────────────────────
+function renderGrid() {
+  const grid  = document.getElementById('camera-grid');
+  const empty = document.getElementById('empty-state');
+  stopAllGrid();
+  grid.innerHTML='';
+
+  if (!cameras.length) {
+    empty.style.display='flex';
+    grid.style.display='none';
+    return;
+  }
+  empty.style.display='none';
+  grid.style.display='grid';
+
+  const n    = cameras.length;
+  const cols = Math.ceil(Math.sqrt(n));
+  const rows = Math.ceil(n/cols);
+  grid.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+  grid.style.gridTemplateRows=`repeat(${rows},1fr)`;
+
+  cameras.forEach(cam=>{
+    const color = SRV_COLORS[cam.srvIdx%SRV_COLORS.length];
+    const card  = document.createElement('div');
+    card.className='cam-card';
+    card.innerHTML=`
+      <div class="cam-label">
+        <span class="cam-label-dot" style="background:${color};"></span>
+        <span class="cam-label-text">${esc(cam.name)}</span>
+        ${cam.hdId?'<span class="cam-label-hd">HD</span>':''}
+        <span class="cam-label-srv">${esc(cam.srvName)}</span>
+      </div>
+      <video id="gridv-${cam.uid}" autoplay muted playsinline></video>
+      <div class="cam-overlay" onclick="openFullscreen('${cam.uid}')" title="Clique para fullscreen${cam.hdId?' em HD':''}"></div>
+      <div class="cam-btn-wrap">
+        <button class="cam-btn" id="abtn-${cam.uid}" style="display:none;" title="Áudio"
+          onclick="event.stopPropagation();toggleAudio('${cam.uid}')">
+          <span class="material-icons" style="font-size:14px;">volume_off</span>
+        </button>
+      </div>`;
+    grid.appendChild(card);
+
+    const vid = card.querySelector('video');
+    startWebRTC(vid, cam.srvUrl, cam.id, `grid-${cam.uid}`, ()=>{
+      cam.hasAudio=true;
+      const btn=document.getElementById(`abtn-${cam.uid}`);
+      if (btn) btn.style.display='flex';
+    });
+  });
+}
+
+// ── Áudio ─────────────────────────────────────────────────────────
+function toggleAudio(camUid) {
+  const v  =document.getElementById(`gridv-${camUid}`);
+  const btn=document.getElementById(`abtn-${camUid}`);
+  if (!v||!btn) return;
+  v.muted=!v.muted;
+  btn.querySelector('.material-icons').textContent=v.muted?'volume_off':'volume_up';
+  btn.classList.toggle('active',!v.muted);
+}
+
+// ── Fullscreen ────────────────────────────────────────────────────
+function openFullscreen(camUid) {
+  const cam=cameras.find(c=>c.uid===camUid);
+  if (!cam) return;
+  const color   =SRV_COLORS[cam.srvIdx%SRV_COLORS.length];
+  const isHD    =!!cam.hdId;
+  const streamId=isHD?cam.hdId:cam.id;
+
+  document.getElementById('fs-dot').style.background     =color;
+  document.getElementById('fs-name').textContent          =cam.name;
+  document.getElementById('fs-badge').innerHTML           =isHD?`<span style="font-size:12px;padding:2px 5px;background:rgba(0,212,255,.15);color:#00d4ff;border:1px solid rgba(0,212,255,.3);border-radius:2px;margin-left:4px;">ALTA RESOLUÇÃO</span>`:'';
+  document.getElementById('fs-quality-label').textContent =isHD?'STREAM HD · ALTA RESOLUÇÃO':'STREAM PADRÃO';
+  document.getElementById('fs-srv').textContent           =cam.srvName;
+  const fsVideo   =document.getElementById('fs-video');
+  const fsAudioBtn=document.getElementById('fs-audio-btn');
+  fsVideo.srcObject=null;
+  fsVideo.muted=true;
+  fsAudioBtn.hidden=!cam.hasAudio;
+  fsAudioBtn.querySelector('.material-icons').textContent='volume_off';
+  fsAudioBtn.classList.remove('active');
+  document.getElementById('fs-overlay').classList.add('open');
+
+  // Câmera sem HD já tocando no grid → reusar stream existente (sem nova conexão)
+  const gridVideo=document.getElementById(`gridv-${cam.uid}`);
+  if (!isHD && gridVideo?.srcObject) {
+    stopWebRTC('fs'); stopMSE('fs');
+    fsVideo.srcObject=gridVideo.srcObject;
+  } else {
+    cam.hasAudio
+      ? startMSE(fsVideo,cam.srvUrl,streamId,'fs')
+      : startWebRTC(fsVideo,cam.srvUrl,streamId,'fs',()=>{ fsAudioBtn.hidden=false; });
+  }
+}
+
+function closeFullscreen() {
+  stopWebRTC('fs'); stopMSE('fs');
+  const fsv=document.getElementById('fs-video');
+  fsv.srcObject=null; fsv.src='';
+  document.getElementById('fs-overlay').classList.remove('open');
+}
+
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeFullscreen(); });
+
+// ── Tema ──────────────────────────────────────────────────────────
+function toggleTheme() {
+  const isLight=document.body.dataset.theme==='light';
+  document.body.dataset.theme=isLight?'':'light';
+  document.getElementById('btn-theme').querySelector('.material-icons').textContent=isLight?'light_mode':'dark_mode';
+  localStorage.setItem('bit2cam_theme',isLight?'dark':'light');
+}
+(function initTheme(){
+  if(localStorage.getItem('bit2cam_theme')==='light'){
+    document.body.dataset.theme='light';
+    document.getElementById('btn-theme').querySelector('.material-icons').textContent='dark_mode';
+  }
+})();
+
+// ── Page Fullscreen ───────────────────────────────────────────────
+function togglePageFullscreen() {
+  if (!document.fullscreenElement)
+    document.documentElement.requestFullscreen().catch(e=>toast(`Fullscreen: ${e.message}`,'err'));
+  else
+    document.exitFullscreen();
+}
+document.addEventListener('fullscreenchange',()=>{
+  const btn=document.getElementById('btn-fullscreen');
+  if (document.fullscreenElement) {
+    btn.innerHTML='<span class="material-icons">fullscreen_exit</span>';
+    document.body.classList.add('fs-mode');
+  } else {
+    btn.innerHTML='<span class="material-icons">fullscreen</span>';
+    document.body.classList.remove('fs-mode');
+  }
+});
+
+// ── Init ──────────────────────────────────────────────────────────
+renderHeader();
+discoverAll();
+setInterval(()=>discoverAll(true), REFRESH_MS);
+</script>
+</body>
+</html>

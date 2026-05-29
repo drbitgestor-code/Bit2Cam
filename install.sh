@@ -163,6 +163,7 @@ if [[ ! -f "$GO2RTC_YAML" ]]; then
 api:
   listen: ":${GO2RTC_PORT}"
   static_dir: ${WWW_DIR}
+  origin: '*'
 
 log:
   level: warn
@@ -396,6 +397,7 @@ _copy_html() {
 
 _copy_html "bit2cam.html"
 _copy_html "setup.html"
+_copy_html "bit2cam-central.html"
 
 # Gravar hash da senha em auth.hash (não mais exposto no HTML)
 SETUP_HASH=$(echo -n "$SETUP_PASSWORD" | sha256sum | awk '{print $1}')

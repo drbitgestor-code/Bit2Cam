@@ -189,7 +189,18 @@ do_update_html() {
 
   _download_html "bit2cam.html"
   _download_html "setup.html"
+  _download_html "bit2cam-central.html"
   _download_py   "config-api.py"
+
+  # Garantir origin: '*' no go2rtc.yaml para o monitor central funcionar cross-origin
+  if [[ -f "$GO2RTC_YAML" ]] && ! grep -q "origin:" "$GO2RTC_YAML"; then
+    if grep -q "static_dir" "$GO2RTC_YAML"; then
+      sed -i "/static_dir/a\\  origin: '*'" "$GO2RTC_YAML"
+    else
+      sed -i "/^api:/a\\  origin: '*'" "$GO2RTC_YAML"
+    fi
+    info "CORS adicionado ao go2rtc.yaml (necessário para bit2cam-central)"
+  fi
 
   section "Reiniciando serviços"
   if systemctl restart go2rtc 2>/dev/null; then
