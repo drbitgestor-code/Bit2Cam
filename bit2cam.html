@@ -617,19 +617,30 @@ function srvName(srvId)  { const s = config.servers.find(s=>s.id===srvId); retur
 function srvUrl(srvId)   { const s = config.servers.find(s=>s.id===srvId); return s?s.url:''; }
 // ── WEBRTC PLAYER ────────────────────────────────────────────────
 const _pcs = {};
+const _wss = {};
 
-async function startWebRTC(videoEl, base, streamId, key) {
+function _deduplicateSdp(sdp) {
+  let seen = new Set();
+  return sdp.split('\r\n').map(l => {
+    if (l.startsWith('m=')) seen = new Set();
+    if (seen.has(l)) return null; seen.add(l); return l;
+  }).filter(l => l !== null).join('\r\n');
+}
+
+function startWebRTC(videoEl, base, streamId, key) {
   stopWebRTC(key);
   if (!/^https?:\/\//i.test(base)) return;
 
-  const pc = new RTCPeerConnection({ iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }], bundlePolicy: 'max-bundle' });
+  const pc = new RTCPeerConnection({
+    iceServers: [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }],
+    bundlePolicy: 'max-bundle'
+  });
   _pcs[key] = pc;
 
   pc.ontrack = ev => {
     if (ev.streams?.[0]) {
       if (videoEl.srcObject !== ev.streams[0]) { videoEl.srcObject = ev.streams[0]; videoEl.play().catch(() => {}); }
     } else {
-      // Firefox: go2rtc usa SDP plan-b → ev.streams pode chegar vazio; monta stream manualmente
       if (!videoEl.srcObject) videoEl.srcObject = new MediaStream();
       videoEl.srcObject.addTrack(ev.track);
       videoEl.play().catch(() => {});
@@ -639,50 +650,54 @@ async function startWebRTC(videoEl, base, streamId, key) {
   pc.addTransceiver('video', { direction: 'recvonly' });
   pc.addTransceiver('audio', { direction: 'recvonly' });
 
-  try {
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    // Aguarda ICE gathering completo — Firefox envia offer sem candidatos (trickle ICE)
-    // go2rtc não suporta trickle; sem candidatos do browser o handshake ICE nunca fecha
-    await new Promise(resolve => {
-      if (pc.iceGatheringState === 'complete') { resolve(); return; }
-      pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === 'complete') resolve(); };
-      setTimeout(resolve, 2000); // fallback: 2s máx (host-only gathering é < 200ms)
-    });
-    const res = await fetch(
-      `${base}/api/webrtc?src=${encodeURIComponent(streamId)}`,
-      { method: 'POST', body: pc.localDescription.sdp, headers: { 'Content-Type': 'application/sdp' }, signal: AbortSignal.timeout(10000) }
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    // Remove linhas duplicadas por seção — go2rtc emite rtcp-fb duplicados; Firefox rejeita SDP inválido
-    // Dedup global quebraria o SDP: linhas como a=ice-pwd são iguais em m=video e m=audio (correto)
-    let _seen = new Set();
-    const sdpAnswer = (await res.text()).split('\r\n').map(l => {
-      if (l.startsWith('m=')) _seen = new Set();
-      if (_seen.has(l)) return null; _seen.add(l); return l;
-    }).filter(l => l !== null).join('\r\n');
-    if (_pcs[key] !== pc) return;
-    await pc.setRemoteDescription({ type: 'answer', sdp: sdpAnswer });
-  } catch(_) {
-    if (_pcs[key] === pc) {
-      pc.close();
-      delete _pcs[key];
-      setTimeout(() => { if (videoEl.isConnected) startWebRTC(videoEl, base, streamId, key); }, 5000);
-    }
-    return;
-  }
+  const wsUrl = base.replace(/^http/, 'ws') + `/api/ws?src=${encodeURIComponent(streamId)}`;
+  const ws = new WebSocket(wsUrl);
+  _wss[key] = ws;
+
+  // Trickle ICE: envia candidatos conforme são coletados (suportado via WebSocket)
+  pc.onicecandidate = ev => {
+    if (ws.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ type: 'webrtc/candidate', value: ev.candidate?.candidate ?? '' }));
+  };
+
+  const retry = () => {
+    const mine = _pcs[key] === pc;
+    if (_pcs[key] === pc) { pc.close(); delete _pcs[key]; }
+    if (_wss[key] === ws)  { ws.close();  delete _wss[key]; }
+    if (mine) setTimeout(() => { if (videoEl.isConnected) startWebRTC(videoEl, base, streamId, key); }, 5000);
+  };
+
+  ws.onopen = async () => {
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      ws.send(JSON.stringify({ type: 'webrtc/offer', value: offer.sdp }));
+    } catch(_) { retry(); }
+  };
+
+  ws.onmessage = async ({ data }) => {
+    try {
+      const msg = JSON.parse(data);
+      if (msg.type === 'webrtc/answer') {
+        await pc.setRemoteDescription({ type: 'answer', sdp: _deduplicateSdp(msg.value) });
+      } else if (msg.type === 'webrtc/candidate' && msg.value) {
+        await pc.addIceCandidate({ candidate: msg.value, sdpMid: '0' });
+      }
+    } catch(_) {}
+  };
+
+  ws.onerror = retry;
+  ws.onclose  = () => { if (_pcs[key] === pc) retry(); };
 
   pc.onconnectionstatechange = () => {
-    if ((pc.connectionState === 'failed' || pc.connectionState === 'disconnected') && _pcs[key] === pc) {
-      pc.close();
-      delete _pcs[key];
-      setTimeout(() => { if (videoEl.isConnected) startWebRTC(videoEl, base, streamId, key); }, 5000);
-    }
+    if ((pc.connectionState === 'failed' || pc.connectionState === 'disconnected') && _pcs[key] === pc)
+      retry();
   };
 }
 
 function stopWebRTC(key) {
   if (_pcs[key]) { _pcs[key].close(); delete _pcs[key]; }
+  if (_wss[key]) { _wss[key].close(); delete _wss[key]; }
 }
 
 // ── MSE PLAYER (câmeras com áudio — passa AAC direto, sem transcodificação) ──
