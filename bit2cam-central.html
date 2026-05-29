@@ -171,7 +171,7 @@
 
 <script>
 const LS_SERVERS = 'bit2cam_central_servers';
-const APP_VERSION = '2026-05-29e';
+const APP_VERSION = '2026-05-29f';
 const REFRESH_MS = 30_000;
 const HD_SUFFIX  = '_hd';
 const SRV_COLORS = ['#2563eb','#22c55e','#f59e0b','#ef4444','#a78bfa','#f97316','#38bdf8','#f43f5e'];
@@ -244,14 +244,8 @@ async function startWebRTC(videoEl,base,streamId,key,onAudio) {
   try {
     const offer=await pc.createOffer();
     await pc.setLocalDescription(offer);
-    // Aguarda ICE gathering — Firefox envia offer sem candidatos (trickle ICE); go2rtc não suporta trickle
-    await new Promise(resolve=>{
-      if(pc.iceGatheringState==='complete'){resolve();return;}
-      pc.onicegatheringstatechange=()=>{if(pc.iceGatheringState==='complete')resolve();};
-      setTimeout(resolve,2000);
-    });
     const res=await fetch(`${base}/api/webrtc?src=${encodeURIComponent(streamId)}`,
-      {method:'POST',body:pc.localDescription.sdp,headers:{'Content-Type':'application/sdp'},signal:AbortSignal.timeout(10000)});
+      {method:'POST',body:offer.sdp,headers:{'Content-Type':'application/sdp'},signal:AbortSignal.timeout(10000)});
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     // Remove linhas duplicadas por seção — go2rtc emite rtcp-fb duplicados; Firefox rejeita SDP inválido
     // Dedup global quebra o SDP: a=ice-pwd é igual em m=video e m=audio (correto pelo BUNDLE)
