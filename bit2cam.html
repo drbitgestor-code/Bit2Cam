@@ -648,9 +648,13 @@ async function startWebRTC(videoEl, base, streamId, key) {
       { method: 'POST', body: pc.localDescription.sdp, headers: { 'Content-Type': 'application/sdp' }, signal: AbortSignal.timeout(10000) }
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    // Remove linhas duplicadas do answer — go2rtc emite rtcp-fb duplicados; Firefox rejeita SDP inválido
-    const seen = new Set();
-    const sdpAnswer = (await res.text()).split('\r\n').filter(l => !seen.has(l) && seen.add(l)).join('\r\n');
+    // Remove linhas duplicadas por seção — go2rtc emite rtcp-fb duplicados; Firefox rejeita SDP inválido
+    // Dedup global quebraria o SDP: linhas como a=ice-pwd são iguais em m=video e m=audio (correto)
+    let _seen = new Set();
+    const sdpAnswer = (await res.text()).split('\r\n').map(l => {
+      if (l.startsWith('m=')) _seen = new Set();
+      if (_seen.has(l)) return null; _seen.add(l); return l;
+    }).filter(l => l !== null).join('\r\n');
     if (_pcs[key] !== pc) return;
     await pc.setRemoteDescription({ type: 'answer', sdp: sdpAnswer });
   } catch(_) {
